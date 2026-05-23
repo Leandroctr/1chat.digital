@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Chatbot - Suporte WhatsApp</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* ============ LOGIN ============ */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+        }
+
+        .login-box h1 {
+            color: #1a472a;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .login-box p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #1a472a;
+            box-shadow: 0 0 0 3px rgba(26, 71, 42, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #1a472a;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0f2818;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(26, 71, 42, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* ============ DASHBOARD ============ */
+        .dashboard-container {
+            display: none;
+            min-height: 100vh;
+            background: #f5f5f5;
+        }
+
+        .dashboard-container.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 20px 40px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #1a472a;
+            font-size: 24px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info span {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .btn-logout {
+            background: #e74c3c;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: #c0392b;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            padding: 20px 40px;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+        }
+
+        .sidebar-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            color: #333;
+            border: 2px solid transparent;
+        }
+
+        .sidebar-item:hover {
+            background: #f5f5f5;
+        }
+
+        .sidebar-item.active {
+            background: #1a472a;
+            color: white;
+            border-color: #1a472a;
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        /* Tabs */
+        .section h2 {
+            color: #1a472a;
+            margin-bottom: 20px;
+            font-size: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-add {
+            background: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-add:hover {
+            background: #229954;
+        }
+
+        /* Table */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .table th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-edit {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #2980b9;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h3 {
+            color: #1a472a;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            background: #ccc;
+            color: #333;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-cancel:hover {
+            background: #bbb;
+        }
+
+        .btn-save {
+            background: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .btn-save:hover {
+            background: #229954;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+                padding: 20px;
+            }
+
+            .sidebar {
+                width: 100%;
+                display: flex;
+                gap: 10px;
+                overflow-x: auto;
+            }
+
+            .sidebar-item {
+                white-space: nowrap;
+            }
+
+            .table {
+                font-size: 12px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px 20px;
+            }
+
+            .user-info {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1a472a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- LOGIN -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-box">
+            <h1>🤖 ChatBot Admin</h1>
+            <p>Sistema de Suporte WhatsApp</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
+                <div class="error-message" id="errorMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="dashboard-container" id="dashboardContainer">
+        <!-- Header -->
+        <div class="header">
+            <h1>🤖 ChatBot Admin</h1>
+            <div class="user-info">
+                <span>Logado como: <strong id="userEmail"></strong></span>
+                <button class="btn-logout" id="logoutBtn">Sair</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-item active" data-section="perguntas">📋 Perguntas/Respostas</div>
+                <div class="sidebar-item" data-section="obrigatorias">⚠️ Perguntas Obrigatórias</div>
+                <div class="sidebar-item" data-section="atendimentos">💬 Atendimentos</div>
+                <div class="sidebar-item" data-section="usuarios">👥 Usuários</div>
+                <div class="sidebar-item" data-section="stats">📊 Estatísticas</div>
+            </div>
+
+            <!-- Content -->
+            <div class="content-area">
+                <!-- Perguntas/Respostas -->
+                <div class="section active" id="perguntasSection">
+                    <h2>
+                        Perguntas & Respostas
+                        <button class="btn-add" id="addPerguntaBtn">+ Adicionar</button>
+                    </h2>
+                    <table class="table" id="perguntasTable">
+                        <thead>
+                            <tr>
+                                <th>Pergunta</th>
+                                <th>Categoria</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="perguntasTableBody">
+                            <tr><td colspan="4" class="empty-state">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Perguntas Obrigatórias -->
+                <div class="section" id="obrigatoriaSection">
+                    <h2>
+                        Perguntas Obrigatórias
+                        <button class="btn-add" id="addObrigatoria">+ Adicionar</button>
+                    </h2>
+                    <table class="table" id="obrigatoriasTable">
+                        <thead>
+                            <tr>
+                                <th>Pergunta</th>
+                                <th>Tipo</th>
+                                <th>Ordem</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="obrigatoriasTableBody">
+                            <tr><td colspan="4" class="empty-state">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Atendimentos -->
+                <div class="section" id="atendimentosSection">
+                    <h2>Histórico de Atendimentos</h2>
+                    <div id="atendimentosList" style="margin-top: 20px;">
+                        <div class="empty-state">Carregando...</div>
+                    </div>
+                </div>
+
+                <!-- Usuários -->
+                <div class="section" id="usuariosSection">
+                    <h2>Gerenciar Usuários</h2>
+                    <table class="table" id="usuariosTable">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Nome</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usuariosTableBody">
+                            <tr><td colspan="5" class="empty-state">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Estatísticas -->
+                <div class="section" id="statsSection">
+                    <h2>Estatísticas</h2>
+                    <div class="stats-grid" id="statsGrid">
+                        <div class="stat-card">
+                            <h3>Total de Perguntas</h3>
+                            <div class="number" id="statPerguntas">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total de Atendimentos</h3>
+                            <div class="number" id="statAtendimentos">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Atendimentos Resolvidos</h3>
+                            <div class="number" id="statResolvidos">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Atendimentos Pendentes</h3>
+                            <div class="number" id="statPendentes">0</div>
+                        </div>
+                    </div>
+                    <h3 style="color: #1a472a; margin-top: 30px; margin-bottom: 20px;">Perguntas Mais Requisitadas</h3>
+                    <table class="table" id="topPerguntasTable">
+                        <thead>
+                            <tr>
+                                <th>Pergunta</th>
+                                <th>Requisições</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topPerguntasBody">
+                            <tr><td colspan="2" class="empty-state">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- Modal Pergunta -->
+    <div class="modal" id="modalPergunta">
+        <div class="modal-content">
+            <h3 id="modalPerguntaTitle">Adicionar Pergunta</h3>
+            <form id="formPergunta">
+                <div class="form-group">
+                    <label for="inputPergunta">Pergunta</label>
+                    <input type="text" id="inputPergunta" required>
+                </div>
+                <div class="form-group">
+                    <label for="inputResposta">Resposta</label>
+                    <textarea id="inputResposta" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit;" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="inputCategoria">Categoria</label>
+                    <input type="text" id="inputCategoria" placeholder="ex: técnico, billing, etc">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="inputAtivo" checked> Ativo
+                    </label>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-cancel" onclick="closePerguntaModal()">Cancelar</button>
+                    <button type="submit" class="btn-save">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Obrigatória -->
+    <div class="modal" id="modalObrigatoria">
+        <div class="modal-content">
+            <h3 id="modalObrigatoriaTitle">Adicionar Pergunta Obrigatória</h3>
+            <form id="formObrigatoria">
+                <div class="form-group">
+                    <label for="inputObrigatoria">Pergunta</label>
+                    <input type="text" id="inputObrigatoria" required>
+                </div>
+                <div class="form-group">
+                    <label for="inputTipo">Tipo</label>
+                    <select id="inputTipo" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="texto">Texto</option>
+                        <option value="cpf">CPF</option>
+                        <option value="email">Email</option>
+                        <option value="telefone">Telefone</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="inputOrdem">Ordem</label>
+                    <input type="number" id="inputOrdem" min="1" required>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-cancel" onclick="closeObrigatoriasModal()">Cancelar</button>
+                    <button type="submit" class="btn-save">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <script>
+        // ========== CONFIG ==========
+        const firebaseConfig = {
+            apiKey: "AIzaSyDLf_6eM_4W45v7FsHiFJDwOO-umvu7B8U",
+            authDomain: "ialorichat.firebaseapp.com",
+            projectId: "ialorichat",
+            storageBucket: "ialorichat.firebasestorage.app",
+            messagingSenderId: "471715355932",
+            appId: "1:471715355932:web:1903e15460e0d46f32aed9"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ========== VARIÁVEIS GLOBAIS ==========
+        let currentUser = null;
+        let currentPerguntaId = null;
+        let currentObrigatoriasId = null;
+
+        // ========== LOGIN ==========
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const errorDiv = document.getElementById('errorMessage');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>';
+
+            try {
+                const result = await auth.signInWithEmailAndPassword(email, password);
+                currentUser = result.user;
+                
+                // Verifica se usuário existe no Firestore
+                const userDoc = await db.collection('usuarios').doc(email).get();
+                if (!userDoc.exists) {
+                    throw new Error('Usuário não registrado no sistema');
+                }
+
+                showDashboard();
+                loadPerguntas();
+                loadObrigatorias();
+                loadAtendimentos();
+                loadUsuarios();
+                loadStats();
+            } catch (error) {
+                errorDiv.textContent = 'Erro ao entrar: ' + error.message;
+                errorDiv.classList.add('show');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Entrar';
+            }
+        });
+
+        // ========== DASHBOARD ==========
+        function showDashboard() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('dashboardContainer').classList.add('active');
+            document.getElementById('userEmail').textContent = currentUser.email;
+        }
+
+        function hideDashboard() {
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('dashboardContainer').classList.remove('active');
+        }
+
+        // ========== LOGOUT ==========
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await auth.signOut();
+            currentUser = null;
+            hideDashboard();
+            document.getElementById('loginForm').reset();
+        });
+
+        // ========== SIDEBAR NAVIGATION ==========
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                const section = item.getAttribute('data-section');
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+                document.getElementById(section + 'Section').classList.add('active');
+            });
+        });
+
+        // ========== PERGUNTAS/RESPOSTAS ==========
+        async function loadPerguntas() {
+            try {
+                const snapshot = await db.collection('perguntas-respostas').get();
+                const tbody = document.getElementById('perguntasTableBody');
+                tbody.innerHTML = '';
+
+                if (snapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma pergunta cadastrada</td></tr>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${data.pergunta}</td>
+                        <td>${data.categoria || '-'}</td>
+                        <td>${data.ativo ? '✅ Ativo' : '❌ Inativo'}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small btn-edit" onclick="editPergunta('${doc.id}')">Editar</button>
+                                <button class="btn-small btn-delete" onclick="deletePergunta('${doc.id}')">Deletar</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar perguntas:', error);
+            }
+        }
+
+        document.getElementById('addPerguntaBtn').addEventListener('click', () => {
+            currentPerguntaId = null;
+            document.getElementById('modalPerguntaTitle').textContent = 'Adicionar Pergunta';
+            document.getElementById('formPergunta').reset();
+            document.getElementById('modalPergunta').classList.add('active');
+        });
+
+        function closePerguntaModal() {
+            document.getElementById('modalPergunta').classList.remove('active');
+        }
+
+        async function editPergunta(id) {
+            currentPerguntaId = id;
+            const doc = await db.collection('perguntas-respostas').doc(id).get();
+            const data = doc.data();
+            
+            document.getElementById('modalPerguntaTitle').textContent = 'Editar Pergunta';
+            document.getElementById('inputPergunta').value = data.pergunta;
+            document.getElementById('inputResposta').value = data.resposta;
+            document.getElementById('inputCategoria').value = data.categoria || '';
+            document.getElementById('inputAtivo').checked = data.ativo;
+            document.getElementById('modalPergunta').classList.add('active');
+        }
+
+        async function deletePergunta(id) {
+            if (!confirm('Tem certeza que deseja deletar esta pergunta?')) return;
+            try {
+                await db.collection('perguntas-respostas').doc(id).delete();
+                loadPerguntas();
+            } catch (error) {
+                alert('Erro ao deletar: ' + error.message);
+            }
+        }
+
+        document.getElementById('formPergunta').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pergunta = document.getElementById('inputPergunta').value;
+            const resposta = document.getElementById('inputResposta').value;
+            const categoria = document.getElementById('inputCategoria').value;
+            const ativo = document.getElementById('inputAtivo').checked;
+
+            try {
+                if (currentPerguntaId) {
+                    await db.collection('perguntas-respostas').doc(currentPerguntaId).update({
+                        pergunta, resposta, categoria, ativo, updatedAt: new Date()
+                    });
+                } else {
+                    await db.collection('perguntas-respostas').add({
+                        pergunta, resposta, categoria, ativo, createdAt: new Date(), updatedAt: new Date()
+                    });
+                }
+                loadPerguntas();
+                closePerguntaModal();
+            } catch (error) {
+                alert('Erro: ' + error.message);
+            }
+        });
+
+        // ========== PERGUNTAS OBRIGATÓRIAS ==========
+        async function loadObrigatorias() {
+            try {
+                const snapshot = await db.collection('perguntas-obrigatorias').orderBy('ordem').get();
+                const tbody = document.getElementById('obrigatoriasTableBody');
+                tbody.innerHTML = '';
+
+                if (snapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma pergunta obrigatória cadastrada</td></tr>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${data.pergunta}</td>
+                        <td>${data.tipo}</td>
+                        <td>${data.ordem}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small btn-edit" onclick="editObrigatoria('${doc.id}')">Editar</button>
+                                <button class="btn-small btn-delete" onclick="deleteObrigatoria('${doc.id}')">Deletar</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar obrigatórias:', error);
+            }
+        }
+
+        document.getElementById('addObrigatoria').addEventListener('click', () => {
+            currentObrigatoriasId = null;
+            document.getElementById('modalObrigatoriaTitle').textContent = 'Adicionar Pergunta Obrigatória';
+            document.getElementById('formObrigatoria').reset();
+            document.getElementById('modalObrigatoria').classList.add('active');
+        });
+
+        function closeObrigatoriasModal() {
+            document.getElementById('modalObrigatoria').classList.remove('active');
+        }
+
+        async function editObrigatoria(id) {
+            currentObrigatoriasId = id;
+            const doc = await db.collection('perguntas-obrigatorias').doc(id).get();
+            const data = doc.data();
+            
+            document.getElementById('modalObrigatoriaTitle').textContent = 'Editar Pergunta Obrigatória';
+            document.getElementById('inputObrigatoria').value = data.pergunta;
+            document.getElementById('inputTipo').value = data.tipo;
+            document.getElementById('inputOrdem').value = data.ordem;
+            document.getElementById('modalObrigatoria').classList.add('active');
+        }
+
+        async function deleteObrigatoria(id) {
+            if (!confirm('Tem certeza que deseja deletar esta pergunta?')) return;
+            try {
+                await db.collection('perguntas-obrigatorias').doc(id).delete();
+                loadObrigatorias();
+            } catch (error) {
+                alert('Erro ao deletar: ' + error.message);
+            }
+        }
+
+        document.getElementById('formObrigatoria').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pergunta = document.getElementById('inputObrigatoria').value;
+            const tipo = document.getElementById('inputTipo').value;
+            const ordem = parseInt(document.getElementById('inputOrdem').value);
+
+            try {
+                if (currentObrigatoriasId) {
+                    await db.collection('perguntas-obrigatorias').doc(currentObrigatoriasId).update({
+                        pergunta, tipo, ordem, updatedAt: new Date()
+                    });
+                } else {
+                    await db.collection('perguntas-obrigatorias').add({
+                        pergunta, tipo, ordem, createdAt: new Date(), updatedAt: new Date()
+                    });
+                }
+                loadObrigatorias();
+                closeObrigatoriasModal();
+            } catch (error) {
+                alert('Erro: ' + error.message);
+            }
+        });
+
+        // ========== ATENDIMENTOS ==========
+        async function loadAtendimentos() {
+            try {
+                const snapshot = await db.collection('atendimentos').orderBy('data', 'desc').limit(50).get();
+                const container = document.getElementById('atendimentosList');
+                container.innerHTML = '';
+
+                if (snapshot.empty) {
+                    container.innerHTML = '<div class="empty-state">Nenhum atendimento registrado</div>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const date = new Date(data.data?.toDate?.() || data.data).toLocaleString('pt-BR');
+                    const status = data.resolvido ? '✅ Resolvido' : '⏳ Pendente';
+                    
+                    const card = document.createElement('div');
+                    card.style.cssText = 'background: #f9f9f9; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #1a472a;';
+                    card.innerHTML = `
+                        <div style="display: flex; justify-content: space-between;">
+                            <div>
+                                <strong>CPF:</strong> ${data.cpf}<br>
+                                <strong>WhatsApp:</strong> ${data.whatsapp}<br>
+                                <strong>Status:</strong> ${status}<br>
+                                <strong>Data:</strong> ${date}
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar atendimentos:', error);
+            }
+        }
+
+        // ========== USUÁRIOS ==========
+        async function loadUsuarios() {
+            try {
+                const snapshot = await db.collection('usuarios').get();
+                const tbody = document.getElementById('usuariosTableBody');
+                tbody.innerHTML = '';
+
+                if (snapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nenhum usuário cadastrado</td></tr>';
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${doc.id}</td>
+                        <td>${data.nome || '-'}</td>
+                        <td>${data.role}</td>
+                        <td>${data.ativo ? '✅ Ativo' : '❌ Inativo'}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small btn-edit" onclick="editUsuario('${doc.id}')">Editar</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+            }
+        }
+
+        // ========== ESTATÍSTICAS ==========
+        async function loadStats() {
+            try {
+                // Total perguntas
+                const perguntasSnap = await db.collection('perguntas-respostas').get();
+                document.getElementById('statPerguntas').textContent = perguntasSnap.size;
+
+                // Atendimentos
+                const atendimentosSnap = await db.collection('atendimentos').get();
+                const totalAtendimentos = atendimentosSnap.size;
+                document.getElementById('statAtendimentos').textContent = totalAtendimentos;
+
+                // Resolvidos e Pendentes
+                let resolvidos = 0, pendentes = 0;
+                atendimentosSnap.forEach(doc => {
+                    if (doc.data().resolvido) resolvidos++;
+                    else pendentes++;
+                });
+                document.getElementById('statResolvidos').textContent = resolvidos;
+                document.getElementById('statPendentes').textContent = pendentes;
+
+                // Top perguntas (mock por enquanto)
+                const tbody = document.getElementById('topPerguntasBody');
+                tbody.innerHTML = '<tr><td colspan="2" class="empty-state">Dados em breve</td></tr>';
+            } catch (error) {
+                console.error('Erro ao carregar stats:', error);
+            }
+        }
+
+        // ========== AUTH STATE ==========
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                db.collection('usuarios').doc(user.email).get().then(doc => {
+                    if (doc.exists) {
+                        showDashboard();
+                    } else {
+                        auth.signOut();
+                    }
+                });
+            } else {
+                hideDashboard();
+            }
+        });
+
+        // ========== MODAL FECHAMENTO ==========
+        window.addEventListener('click', (e) => {
+            if (e.target.id === 'modalPergunta') {
+                closePerguntaModal();
+            }
+            if (e.target.id === 'modalObrigatoria') {
+                closeObrigatoriasModal();
+            }
+        });
+    </script>
+</body>
+</html>
