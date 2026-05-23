@@ -1,0 +1,72 @@
+// FIRESTORE RULES
+// 
+// INSTRUÇÕES:
+// 1. Va em Firebase Console → Firestore → Rules
+// 2. Apague tudo que tá lá
+// 3. Cole esse código
+// 4. Clique em "Publicar"
+// 5. Aguarde alguns segundos pra aplicar
+//
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Função auxiliar para validar se usuário é admin
+    function isAdmin() {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.token.email));
+      return userData.data.role == 'admin';
+    }
+
+    // Função auxiliar para validar se usuário é operador
+    function isOperador() {
+      let userData = get(/databases/$(database)/documents/usuarios/$(request.auth.token.email));
+      return userData.data.role == 'operador';
+    }
+
+    // Função auxiliar: user autenticado existe no banco
+    function userExists() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.token.email));
+    }
+
+    // ============ USUÁRIOS ============
+    match /usuarios/{email} {
+      // Apenas admin pode ler/editar todos os usuários
+      allow read, write: if request.auth.uid != null && isAdmin();
+      
+      // Cada usuário pode ler seus próprios dados
+      allow read: if request.auth.token.email == email && request.auth.uid != null;
+    }
+
+    // ============ PERGUNTAS/RESPOSTAS ============
+    match /perguntas-respostas/{document=**} {
+      // Qualquer usuário autenticado pode ler
+      allow read: if request.auth.uid != null && userExists();
+      
+      // Apenas admin pode editar/deletar
+      allow create, update, delete: if request.auth.uid != null && isAdmin();
+    }
+
+    // ============ PERGUNTAS OBRIGATÓRIAS ============
+    match /perguntas-obrigatorias/{document=**} {
+      // Qualquer usuário autenticado pode ler
+      allow read: if request.auth.uid != null && userExists();
+      
+      // Apenas admin pode editar/deletar
+      allow create, update, delete: if request.auth.uid != null && isAdmin();
+    }
+
+    // ============ ATENDIMENTOS ============
+    match /atendimentos/{document=**} {
+      // Qualquer usuário autenticado pode ler atendimentos
+      allow read: if request.auth.uid != null && userExists();
+      
+      // Qualquer usuário autenticado pode criar/atualizar atendimentos
+      // (para o bot registrar interações)
+      allow create, update: if request.auth.uid != null && userExists();
+      
+      // Apenas admin pode deletar
+      allow delete: if request.auth.uid != null && isAdmin();
+    }
+  }
+}

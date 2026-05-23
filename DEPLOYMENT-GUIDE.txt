@@ -1,0 +1,196 @@
+🚀 GUIA RÁPIDO DE DEPLOYMENT
+============================
+
+⏱️ Tempo total: ~15 minutos
+
+PASSO 1: PREPARAR NO GITHUB
+═══════════════════════════
+
+1. Va em https://github.com/new
+2. Nome repo: "chatbot-admin"
+3. Descrição: "Painel admin do chatbot WhatsApp"
+4. Clique em "Create repository"
+5. Copie o link (ex: https://github.com/seu-user/chatbot-admin.git)
+
+PASSO 2: BAIXAR OS ARQUIVOS
+═════════════════════════════
+
+Você vai receber 4 arquivos:
+- index.html (o painel principal - RENOMEAR de chatbot-admin.html)
+- README.md (documentação)
+- setup.html (para criar usuários)
+- firestore-rules.txt (regras de segurança)
+
+PASSO 3: FAZER UPLOAD NO GITHUB
+═════════════════════════════════
+
+Opção A: Via GitHub Web (mais fácil)
+───────────────────────────────────
+
+1. No GitHub, clique em "Upload files"
+2. Selecione:
+   - index.html ← renomear de chatbot-admin.html pra index.html
+   - README.md
+   - setup.html
+   - firestore-rules.txt
+3. Clique "Commit changes"
+4. Pronto! ✅
+
+Opção B: Via Terminal (se souber Git)
+──────────────────────────────────────
+
+```bash
+mkdir chatbot-admin
+cd chatbot-admin
+git init
+git remote add origin https://github.com/seu-user/chatbot-admin.git
+# copiar os arquivos pra essa pasta
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git push -u origin main
+```
+
+PASSO 4: CONFIGURAR FIRESTORE
+══════════════════════════════════
+
+1. Va em https://console.firebase.google.com
+2. Selecione projeto "ialorichat"
+3. Clique em "Firestore Database"
+4. Clique em "Rules"
+5. Apague TUDO
+6. Cole o conteúdo de firestore-rules.txt
+7. Clique em "Publicar"
+8. Aguarde alguns segundos ✅
+
+PASSO 5: FAZER DEPLOY NO FIREBASE HOSTING
+═══════════════════════════════════════════
+
+Opção A: Firebase CLI (Windows/Mac/Linux)
+──────────────────────────────────────────
+
+```bash
+# 1. Instale Node.js (se ainda não tem)
+# Baixe em: https://nodejs.org
+
+# 2. Instale Firebase CLI
+npm install -g firebase-tools
+
+# 3. Entre no Terminal/PowerShell e logue
+firebase login
+
+# 4. Crie uma pasta local
+mkdir meu-chatbot
+cd meu-chatbot
+
+# 5. Inicialize Firebase
+firebase init hosting
+
+# Quando perguntar:
+# "What do you want to use as your public directory?" → pressione ENTER (usa "public")
+# "Configure as a single page app?" → Y
+
+# 6. Copie o index.html pra pasta "public"
+
+# 7. Faça deploy
+firebase deploy
+
+# Sua URL vai ser: https://ialorichat.firebaseapp.com
+```
+
+Opção B: Firebase Console (Web)
+────────────────────────────────
+
+Se não quiser usar Terminal:
+
+1. Va em Firebase Console → Hosting
+2. Clique "Começar"
+3. Copie as 3 linhas de comando (firebase login, firebase init, firebase deploy)
+4. Cole no Terminal/PowerShell
+5. Pronto! ✅
+
+PASSO 6: CRIAR USUÁRIOS NO FIRESTORE
+═════════════════════════════════════
+
+⚠️ IMPORTANTE: Faça isso ANTES de qualquer coisa
+
+1. Firebase Console → Authentication → Usuários
+2. Clique "Adicionar usuário"
+3. Email: seu-admin@email.com
+4. Senha: Inicial@123
+5. Clique "Adicionar usuário"
+6. Repita 3 vezes para os 3 operadores
+
+Agora vem a parte importante:
+
+7. Firebase Console → Firestore Database
+8. Clique "Iniciar uma coleção"
+9. Nome: "usuarios"
+10. Clique "Próximo"
+11. ID do documento: seu-admin@email.com (EXATAMENTE igual ao email)
+12. Campos:
+    - nome: "Seu Nome"
+    - email: "seu-admin@email.com"
+    - role: "admin"
+    - ativo: true
+13. Clique "Salvar"
+
+Repita para operadores (role = "operador")
+
+OU AUTOMÁTICO:
+
+1. Abra seu site (https://ialorichat.firebaseapp.com)
+2. Abra também setup.html (localmente)
+3. Logue no setup.html com seu admin
+4. Preencha os 3 operadores
+5. Clique "Criar Usuários"
+✅ Pronto!
+
+PASSO 7: TESTAR
+═══════════════
+
+1. Va em https://ialorichat.firebaseapp.com
+2. Email: seu-admin@email.com
+3. Senha: Inicial@123
+4. Se entrou, sucesso! ✅
+5. Teste criar uma pergunta
+6. Teste adicionar um operador
+7. Logue com um operador
+
+PASSO 8: PRÓXIMA ETAPA - BOT
+════════════════════════════
+
+Quando tudo estiver funcionando, a gente desenvolve:
+- Bot WhatsApp (Node.js no Railway)
+- Integração com a API
+- Recuperação de senha
+
+═════════════════════════════════════════════════════════
+
+❓ DÚVIDAS COMUNS
+
+P: "Não consigo entrar no site"
+R: Verifique se criou o documento em "usuarios" com seu email exato
+
+P: "Botão não funciona"
+R: Abra Console (F12 no navegador) e veja a mensagem de erro
+
+P: "Firebase Rules disse que foi negado"
+R: Você publicou as rules? Vai em Firestore → Rules e verifica
+
+P: "Qual é minha URL?"
+R: https://ialorichat.firebaseapp.com
+
+═════════════════════════════════════════════════════════
+
+✅ QUANDO TUDO ESTIVER PRONTO:
+
+1. Admin consegue fazer login
+2. Admin consegue adicionar perguntas
+3. Admin consegue adicionar operadores
+4. Operadores conseguem fazer login
+5. Operadores conseguem ver as perguntas
+
+Se tudo isso funcionar, avisa que estou pronto pro bot! 🚀
+
+═════════════════════════════════════════════════════════
