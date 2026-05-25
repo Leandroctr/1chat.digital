@@ -573,7 +573,10 @@
 
                 <!-- Usuários -->
                 <div class="section" id="usuariosSection">
-                    <h2>Gerenciar Usuários</h2>
+                    <h2>
+                        Gerenciar Usuários
+                        <button class="btn-add" id="addUsuarioBtn">+ Novo Usuário</button>
+                    </h2>
                     <table class="table" id="usuariosTable">
                         <thead>
                             <tr>
@@ -660,8 +663,43 @@
         </div>
     </div>
 
-    <!-- Modal Obrigatória -->
-    <div class="modal" id="modalObrigatoria">
+    <!-- Modal Usuário -->
+    <div class="modal" id="modalUsuario">
+        <div class="modal-content">
+            <h3 id="modalUsuarioTitle">Novo Usuário</h3>
+            <form id="formUsuario">
+                <div class="form-group">
+                    <label for="inputEmailUsuario">Email</label>
+                    <input type="email" id="inputEmailUsuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="inputNomeUsuario">Nome</label>
+                    <input type="text" id="inputNomeUsuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="inputSenhaUsuario">Senha (inicial)</label>
+                    <input type="password" id="inputSenhaUsuario" required placeholder="Mínimo 6 caracteres">
+                </div>
+                <div class="form-group">
+                    <label for="inputRoleUsuario">Permissão (Role)</label>
+                    <select id="inputRoleUsuario" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="operador">Operador (Pode ler perguntas)</option>
+                        <option value="admin">Admin (Pode editar tudo)</option>
+                        <option value="leitor">Leitor (Apenas visualizar)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="inputAtivoUsuario" checked> Usuário Ativo
+                    </label>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-cancel" onclick="closeUsuarioModal()">Cancelar</button>
+                    <button type="submit" class="btn-save">Criar Usuário</button>
+                </div>
+            </form>
+        </div>
+    </div>
         <div class="modal-content">
             <h3 id="modalObrigatoriaTitle">Adicionar Pergunta Obrigatória</h3>
             <form id="formObrigatoria">
@@ -1016,11 +1054,14 @@
                     row.innerHTML = `
                         <td>${doc.id}</td>
                         <td>${data.nome || '-'}</td>
-                        <td>${data.role}</td>
+                        <td>
+                            <strong>${data.role === 'admin' ? '🔑 Admin' : data.role === 'operador' ? '👤 Operador' : '👁️ Leitor'}</strong>
+                        </td>
                         <td>${data.ativo ? '✅ Ativo' : '❌ Inativo'}</td>
                         <td>
                             <div class="action-buttons">
                                 <button class="btn-small btn-edit" onclick="editUsuario('${doc.id}')">Editar</button>
+                                <button class="btn-small btn-delete" onclick="deleteUsuario('${doc.id}')">Deletar</button>
                             </div>
                         </td>
                     `;
@@ -1030,6 +1071,101 @@
                 console.error('Erro ao carregar usuários:', error);
             }
         }
+
+        document.getElementById('addUsuarioBtn').addEventListener('click', () => {
+            document.getElementById('modalUsuarioTitle').textContent = 'Novo Usuário';
+            document.getElementById('formUsuario').reset();
+            document.getElementById('inputSenhaUsuario').style.display = 'block';
+            document.querySelector('label[for="inputSenhaUsuario"]').style.display = 'block';
+            document.getElementById('modalUsuario').classList.add('active');
+        });
+
+        function closeUsuarioModal() {
+            document.getElementById('modalUsuario').classList.remove('active');
+        }
+
+        async function editUsuario(email) {
+            try {
+                const doc = await db.collection('usuarios').doc(email).get();
+                const data = doc.data();
+                
+                document.getElementById('modalUsuarioTitle').textContent = 'Editar Usuário';
+                document.getElementById('inputEmailUsuario').value = email;
+                document.getElementById('inputEmailUsuario').disabled = true;
+                document.getElementById('inputNomeUsuario').value = data.nome || '';
+                document.getElementById('inputRoleUsuario').value = data.role || 'operador';
+                document.getElementById('inputAtivoUsuario').checked = data.ativo;
+                
+                // Esconde campo de senha pois está editando
+                document.getElementById('inputSenhaUsuario').style.display = 'none';
+                document.querySelector('label[for="inputSenhaUsuario"]').style.display = 'none';
+                
+                document.getElementById('modalUsuario').classList.add('active');
+                window.currentUsuarioEmail = email;
+            } catch (error) {
+                alert('Erro ao carregar usuário: ' + error.message);
+            }
+        }
+
+        async function deleteUsuario(email) {
+            if (!confirm(`Tem certeza que deseja deletar o usuário ${email}?`)) return;
+            try {
+                await db.collection('usuarios').doc(email).delete();
+                loadUsuarios();
+                alert('Usuário deletado com sucesso!');
+            } catch (error) {
+                alert('Erro ao deletar: ' + error.message);
+            }
+        }
+
+        document.getElementById('formUsuario').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('inputEmailUsuario').value;
+            const nome = document.getElementById('inputNomeUsuario').value;
+            const role = document.getElementById('inputRoleUsuario').value;
+            const ativo = document.getElementById('inputAtivoUsuario').checked;
+            const senha = document.getElementById('inputSenhaUsuario').value;
+
+            try {
+                if (window.currentUsuarioEmail) {
+                    // Editando usuário existente (só atualiza Firestore)
+                    await db.collection('usuarios').doc(email).update({
+                        nome, role, ativo, updatedAt: new Date()
+                    });
+                    alert('Usuário atualizado com sucesso!');
+                    delete window.currentUsuarioEmail;
+                } else {
+                    // Criando novo usuário
+                    if (senha.length < 6) {
+                        alert('Senha deve ter no mínimo 6 caracteres');
+                        return;
+                    }
+
+                    // Cria usuário no Firebase Authentication
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
+                    
+                    // Cria documento no Firestore
+                    await db.collection('usuarios').doc(email).set({
+                        nome, email, role, ativo, createdAt: new Date(), updatedAt: new Date()
+                    });
+
+                    alert(`Usuário ${email} criado com sucesso!\n\nRole: ${role}\nSenha: ${senha}\n\n⚠️ Guarde essa informação! O usuário pode mudar a senha no primeiro login.`);
+                }
+                
+                loadUsuarios();
+                closeUsuarioModal();
+            } catch (error) {
+                let mensagem = error.message;
+                if (error.code === 'auth/email-already-in-use') {
+                    mensagem = 'Email já está registrado!';
+                } else if (error.code === 'auth/invalid-email') {
+                    mensagem = 'Email inválido!';
+                } else if (error.code === 'auth/weak-password') {
+                    mensagem = 'Senha fraca (mínimo 6 caracteres)';
+                }
+                alert('Erro: ' + mensagem);
+            }
+        });
 
         // ========== ESTATÍSTICAS ==========
         async function loadStats() {
@@ -1083,6 +1219,9 @@
             }
             if (e.target.id === 'modalObrigatoria') {
                 closeObrigatoriasModal();
+            }
+            if (e.target.id === 'modalUsuario') {
+                closeUsuarioModal();
             }
         });
     </script>
