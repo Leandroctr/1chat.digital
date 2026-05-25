@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     libnss3 \
     libgbm1 \
     libpango-1.0-0 \
-    libpango-gobject-0 \
+    libpangocairo-1.0-0 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
     libdbus-1-3 \
