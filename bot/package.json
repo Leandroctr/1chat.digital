@@ -1,1 +1,31 @@
+{
+  "name": "ialorichat-bot",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp automático com Firebase",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "chatbot",
+    "firebase"
+  ],
+  "author": "Leandro",
+  "license": "MIT",
+  "dependencies": {
+    "whatsapp-web.js": "^1.25.0",
+    "qrcode-terminal": "^0.12.0",
+    "firebase-admin": "^12.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
 
