@@ -1,1 +1,26 @@
+# Dependências
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Arquivos sensíveis
+serviceAccountKey.json
+.env
+.env.local
+.env.*.local
+
+# Credenciais Firebase
+**/credentials.json
+**/key.json
+
+# Cache
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporários
+*.tmp
+*.temp
+session.json
 
