@@ -25,4 +25,5 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["cd", "bot", "&&", "npm", "install", "&&", "npm", "start"]
+WORKDIR /app/bot
+CMD npm install && npm start
