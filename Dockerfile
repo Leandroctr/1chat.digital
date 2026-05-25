@@ -26,4 +26,7 @@ COPY . .
 EXPOSE 3000
 
 WORKDIR /app/bot
-CMD npm install && npm start
+
+RUN npm install
+
+CMD npm start
