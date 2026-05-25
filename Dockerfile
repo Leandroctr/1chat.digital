@@ -1,7 +1,11 @@
-FROM node:18
+FROM ghcr.io/puppeteer/puppeteer:22.6.0
 
 WORKDIR /app/bot
+
+COPY bot/package*.json ./
+
+RUN npm ci
+
 COPY bot/ .
 
-RUN npm install
 CMD ["npm", "start"]
