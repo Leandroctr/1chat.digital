@@ -2,12 +2,18 @@ FROM node:20-slim
 
 WORKDIR /app
 
-COPY backend/package*.json ./
+# Copia package.json
+COPY backend/package.json .
 
+# Instala dependências
 RUN npm install
 
-COPY backend/ ./
+# Copia TUDO do backend
+COPY backend/server.js .
+COPY backend/.env .
 
+# Porta
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Inicia
+CMD ["node", "server.js"]
