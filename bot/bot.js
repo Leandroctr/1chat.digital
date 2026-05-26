@@ -1,11 +1,13 @@
 // ================================
-// BOT WHATSAPP - IALORICHAT
-// Node.js + whatsapp-web.js + Firebase
+// BOT WHATSAPP - IALORICHAT (BAILEYS)
+// Node.js + Baileys + Firebase
+// Funciona perfeitamente no Railway!
 // ================================
 
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
 const firebase = require('firebase-admin');
+const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 
@@ -13,103 +15,152 @@ const path = require('path');
 // CONFIGURAÇÃO FIREBASE
 // ================================
 
-const serviceAccount = require('./serviceAccountKey.json'); // Arquivo que você vai criar
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY || '{}');
+
+if (!serviceAccount.project_id) {
+    console.error('❌ ERRO: SERVICE_ACCOUNT_KEY não configurada!');
+    process.exit(1);
+}
 
 firebase.initializeApp({
     credential: firebase.credential.cert(serviceAccount),
-    projectId: 'ialorichat'
+    projectId: serviceAccount.project_id
 });
 
 const db = firebase.firestore();
 
 // ================================
-// CLIENTE WHATSAPP
+// DIRETÓRIO DE SESSÃO
 // ================================
 
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
-});
+const sessionsDir = './sessions';
+if (!fs.existsSync(sessionsDir)) {
+    fs.mkdirSync(sessionsDir, { recursive: true });
+}
 
 // ================================
-// EVENTOS
+// INICIALIZAR BOT
 // ================================
 
-client.on('qr', (qr) => {
-    console.log('\n📱 ESCANEIE O QR CODE COM WHATSAPP:\n');
-    qrcode.generate(qr, { small: true });
-    console.log('\n✅ QR Code gerado! Escaneie com seu WhatsApp\n');
-});
+async function conectarWhatsApp() {
+    const { state, saveCreds } = await useMultiFileAuthState(sessionsDir);
 
-client.on('ready', async () => {
-    console.log('✅ BOT CONECTADO E PRONTO!');
-    console.log('🤖 Aguardando mensagens...\n');
-    
-    // Atualiza status no Firebase
-    await db.collection('config').doc('whatsapp').set({
-        status: 'conectado',
-        ultimaConexao: new Date(),
-        bot: 'ativo'
-    }, { merge: true });
-});
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false
+    });
 
-client.on('message', async (message) => {
-    try {
-        // Ignora mensagens do bot e grupos
-        if (message.from === client.info.wid.user || message.isGroupMsg) {
-            return;
+    // ================================
+    // QR CODE
+    // ================================
+
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            console.log('\n📱 GERANDO QR CODE...\n');
+            
+            // Exibir QR Code no terminal
+            QRCode.toString(qr, { type: 'terminal' }, (err, string) => {
+                if (!err) {
+                    console.log(string);
+                }
+            });
+
+            console.log('\n✅ Escaneie o código acima com WhatsApp');
+            console.log('🔗 Menu → Aparelhos Conectados → Conectar Aparelho\n');
         }
 
-        console.log(`\n📨 Nova mensagem de: ${message.from}`);
-        console.log(`📝 Conteúdo: ${message.body}`);
+        if (connection === 'open') {
+            console.log('✅ BOT CONECTADO E PRONTO!');
+            console.log('🤖 Aguardando mensagens...\n');
 
-        // Registra atendimento
-        const contactName = (await message.getContact()).pushname || 'Desconhecido';
-        
-        await registrarAtendimento({
-            whatsapp: message.from,
-            nome: contactName,
-            mensagem: message.body,
-            data: new Date()
-        });
-
-        // Busca resposta no Firestore
-        const resposta = await buscarResposta(message.body);
-
-        if (resposta) {
-            console.log(`✅ Resposta encontrada: ${resposta.substring(0, 50)}...`);
-            
-            // Aguarda 1 segundo antes de responder (mais natural)
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Responde
-            await message.reply(resposta);
-            console.log('✉️ Resposta enviada!\n');
-        } else {
-            console.log('❌ Nenhuma resposta encontrada');
-            console.log('📤 Enviando mensagem padrão...\n');
-            
-            // Resposta padrão
-            const respostaPadrao = `Oi ${contactName}! 👋\n\nDesculpe, não encontrei uma resposta exata para sua pergunta.\n\nTem algo mais específico que posso ajudar?`;
-            await message.reply(respostaPadrao);
+            // Atualiza status no Firebase
+            await db.collection('config').doc('whatsapp').set({
+                status: 'conectado',
+                ultimaConexao: new Date(),
+                bot: 'ativo'
+            }, { merge: true });
         }
 
-    } catch (error) {
-        console.error('❌ Erro ao processar mensagem:', error);
-    }
-});
+        if (connection === 'close') {
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            
+            console.log('⚠️ Conexão fechada:', lastDisconnect?.error);
+            
+            if (shouldReconnect) {
+                console.log('🔄 Tentando reconectar...\n');
+                setTimeout(() => conectarWhatsApp(), 3000);
+            } else {
+                console.log('❌ Login expirado. Escaneie QR Code novamente.\n');
+                
+                // Limpa sessão
+                if (fs.existsSync(sessionsDir)) {
+                    fs.rmSync(sessionsDir, { recursive: true });
+                }
+                
+                setTimeout(() => conectarWhatsApp(), 3000);
+            }
+        }
+    });
 
-client.on('disconnected', async (reason) => {
-    console.log('⚠️ BOT DESCONECTADO:', reason);
-    
-    await db.collection('config').doc('whatsapp').set({
-        status: 'desconectado',
-        ultimaDesconexao: new Date(),
-        motivo: reason
-    }, { merge: true });
-});
+    // ================================
+    // MENSAGENS
+    // ================================
+
+    sock.ev.on('messages.upsert', async (m) => {
+        const message = m.messages[0];
+
+        if (!message.message) return;
+        if (message.key.fromMe) return;
+        if (message.key.remoteJid.includes('g.us')) return; // Ignora grupos
+
+        try {
+            const conversaId = message.key.remoteJid;
+            const textoMensagem = message.message.conversation || 
+                                 message.message.extendedTextMessage?.text || '';
+
+            console.log(`\n📨 Nova mensagem de: ${conversaId}`);
+            console.log(`📝 Conteúdo: ${textoMensagem}`);
+
+            // Registra atendimento
+            await registrarAtendimento({
+                whatsapp: conversaId,
+                mensagem: textoMensagem,
+                data: new Date()
+            });
+
+            // Busca resposta
+            const resposta = await buscarResposta(textoMensagem);
+
+            if (resposta) {
+                console.log(`✅ Resposta encontrada`);
+                
+                // Aguarda 1 segundo (mais natural)
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Responde
+                await sock.sendMessage(conversaId, { text: resposta });
+                console.log('✉️ Resposta enviada!\n');
+            } else {
+                console.log('❌ Nenhuma resposta encontrada');
+                
+                // Resposta padrão
+                const respostaPadrao = `Olá! 👋\n\nDesculpe, não encontrei uma resposta exata para sua pergunta.\n\nTem algo mais específico que posso ajudar?`;
+                await sock.sendMessage(conversaId, { text: respostaPadrao });
+                console.log('📤 Resposta padrão enviada!\n');
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao processar mensagem:', error);
+        }
+    });
+
+    // Salva credenciais
+    sock.ev.on('creds.update', saveCreds);
+
+    return sock;
+}
 
 // ================================
 // FUNÇÕES
@@ -137,18 +188,18 @@ async function buscarResposta(perguntaUsuario) {
             }
             
             // Correspondência parcial (palavras-chave)
-            const palavrasUsuario = perguntaLower.split(' ');
+            const palavrasUsuario = perguntaLower.split(' ').filter(p => p.length > 2);
             const palavrasBD = perguntaBD.split(' ');
             
             let matches = 0;
             for (const palavra of palavrasUsuario) {
-                if (palavra.length > 2 && palavrasBD.some(p => p.includes(palavra))) {
+                if (palavrasBD.some(p => p.includes(palavra))) {
                     matches++;
                 }
             }
             
             // Se 60% das palavras correspondem
-            if (matches / palavrasUsuario.length >= 0.6) {
+            if (palavrasUsuario.length > 0 && matches / palavrasUsuario.length >= 0.6) {
                 return data.resposta;
             }
         }
@@ -164,27 +215,26 @@ async function registrarAtendimento(dados) {
     try {
         await db.collection('atendimentos').add({
             whatsapp: dados.whatsapp,
-            nome: dados.nome,
             ultimaMensagem: dados.mensagem,
             data: dados.data,
             resolvido: false
         });
         
-        console.log('✅ Atendimento registrado no Firebase');
+        console.log('✅ Atendimento registrado');
     } catch (error) {
         console.error('Erro ao registrar atendimento:', error);
     }
 }
 
 // ================================
-// INICIALIZAR BOT
+// INICIAR
 // ================================
 
 console.log('🚀 Iniciando BOT WhatsApp...');
-console.log('⏳ Aguarde o QR Code aparecer...\n');
+console.log('⏳ Aguarde o QR Code...\n');
 
-client.initialize().catch((error) => {
-    console.error('❌ Erro ao inicializar:', error);
+conectarWhatsApp().catch(err => {
+    console.error('❌ Erro fatal:', err);
     process.exit(1);
 });
 
@@ -194,14 +244,5 @@ client.initialize().catch((error) => {
 
 process.on('SIGINT', async () => {
     console.log('\n\n🛑 Desconectando BOT...');
-    await client.destroy();
-    console.log('✅ BOT desconectado');
     process.exit(0);
 });
-
-// ================================
-// EXPORT (para Railway)
-// ================================
-
-module.exports = { client };
-
