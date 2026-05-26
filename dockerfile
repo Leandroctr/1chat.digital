@@ -6,6 +6,7 @@ COPY backend/package*.json ./
 
 RUN npm install
 
-COPY backend/ .
+COPY backend/server.js ./
+COPY backend/.env ./
 
 CMD ["npm", "start"]
