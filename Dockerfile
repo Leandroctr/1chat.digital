@@ -1,10 +1,10 @@
-FROM ghcr.io/puppeteer/puppeteer:22.6.0
+FROM node:18-slim
 
 WORKDIR /app/bot
 
 COPY bot/package*.json ./
 
-RUN npm ci
+RUN npm install
 
 COPY bot/ .
 
