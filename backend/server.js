@@ -1,357 +1,442 @@
-import express from 'express';
-import axios from 'axios';
-import admin from 'firebase-admin';
-import dotenv from 'dotenv';
-import cors from 'cors';
+// ========================================
+// 🚀 BACKEND COMPLETO - PRONTO RAILWAY
+// ========================================
 
-dotenv.config();
-
-// ================================
-// CONFIGURAÇÃO EXPRESS
-// ================================
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+const admin = require('firebase-admin');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ========================================
+// 🔧 MIDDLEWARE
+// ========================================
+
 app.use(express.json());
-app.use(cors());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: false
+}));
 
-// ================================
-// CONFIGURAÇÃO FIREBASE
-// ================================
+// ========================================
+// 🔐 FIREBASE CONFIG
+// ========================================
 
-const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY || '{}');
+let db = null;
 
-if (!serviceAccount.project_id) {
-    console.error('❌ ERRO: SERVICE_ACCOUNT_KEY não configurada!');
-    process.exit(1);
+try {
+  // Parsear SERVICE_ACCOUNT_KEY se for string JSON
+  const serviceAccountKey = process.env.SERVICE_ACCOUNT_KEY;
+  
+  if (!serviceAccountKey) {
+    console.warn('⚠️ SERVICE_ACCOUNT_KEY não encontrada. Firebase desabilitado.');
+  } else {
+    let parsedKey;
+    
+    // Se for string, faz parse
+    if (typeof serviceAccountKey === 'string') {
+      parsedKey = JSON.parse(serviceAccountKey);
+    } else {
+      parsedKey = serviceAccountKey;
+    }
+
+    // Inicializar Firebase Admin SDK
+    admin.initializeApp({
+      credential: admin.credential.cert(parsedKey),
+      projectId: parsedKey.project_id
+    });
+
+    db = admin.firestore();
+    console.log('✅ Firebase Firestore conectado');
+  }
+} catch (error) {
+  console.error('❌ Erro ao conectar Firebase:', error.message);
+  db = null;
 }
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.project_id
-});
+// ========================================
+// 📋 VARIÁVEIS DE AMBIENTE
+// ========================================
 
-const db = admin.firestore();
-
-// ================================
-// CONFIGURAÇÃO EVOLUTION API
-// ================================
-
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'http://localhost:8080';
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://seu-domain.up.railway.app/webhook/messages';
+const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'http://evolution:8080';
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'seu-api-key';
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'ialorichat';
 
-if (!EVOLUTION_API_KEY) {
-    console.error('❌ ERRO: EVOLUTION_API_KEY não configurada!');
-    process.exit(1);
-}
+console.log(`
+📊 ===== CONFIGURAÇÃO =====
+🔌 PORT: ${PORT}
+🌐 WEBHOOK_URL: ${WEBHOOK_URL}
+🔗 EVOLUTION_API: ${EVOLUTION_API_URL}
+📱 INSTANCE: ${EVOLUTION_INSTANCE}
+✅ Firebase: ${db ? 'Conectado' : 'Desabilitado'}
+========================
+`);
 
-// ================================
-// CLIENTE EVOLUTION API
-// ================================
-
-const evolutionClient = axios.create({
-    baseURL: EVOLUTION_API_URL,
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${EVOLUTION_API_KEY}`
-    }
-});
-
-// ================================
-// HEALTH CHECK
-// ================================
+// ========================================
+// 🏥 HEALTH CHECK
+// ========================================
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date() });
+  res.json({
+    status: 'OK',
+    message: 'Backend is running',
+    timestamp: new Date(),
+    webhook_url: WEBHOOK_URL,
+    evolution_instance: EVOLUTION_INSTANCE,
+    firebase: db ? 'connected' : 'disabled'
+  });
 });
 
-// ================================
-// WEBHOOK: Receber mensagens
-// ================================
+// ========================================
+// 📨 WEBHOOK - RECEBER MENSAGENS
+// ========================================
 
 app.post('/webhook/messages', async (req, res) => {
-    try {
-        const { data } = req.body;
+  try {
+    console.log('\n📨 ========== WEBHOOK RECEBIDO ==========');
+    console.log('Headers:', req.headers);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
 
-        if (!data || !data.message) {
-            return res.status(200).json({ received: true });
-        }
+    // Extrai dados da mensagem
+    const { data } = req.body;
 
-        const mensagem = data.message;
-        const remetente = data.sender;
-        const textoMensagem = mensagem.text || mensagem.body || '';
+    if (!data) {
+      console.warn('⚠️ Dados incompletos no webhook');
+      return res.status(400).json({ error: 'Dados inválidos - faltam campos obrigatórios' });
+    }
 
-        if (!textoMensagem.trim()) {
-            return res.status(200).json({ received: true });
-        }
+    const {
+      key,
+      pushName,
+      message,
+      messageTimestamp,
+      sender,
+      remoteJid
+    } = data;
 
-        console.log(`\n📨 Mensagem recebida de: ${remetente}`);
-        console.log(`📝 Conteúdo: ${textoMensagem}`);
+    // Validar dados
+    if (!message || !sender) {
+      console.warn('⚠️ Mensagem ou sender não encontrados');
+      return res.status(400).json({ error: 'Mensagem e sender são obrigatórios' });
+    }
 
-        // Registra atendimento
-        await registrarAtendimento({
-            whatsapp: remetente,
-            mensagem: textoMensagem,
-            data: new Date()
+    // Extrair número (remover @s.whatsapp.com ou @g.us)
+    const numero = sender.replace(/@s\.whatsapp\.com|@g\.us/g, '');
+    
+    // Extrair texto da mensagem (pode estar em diferentes formatos)
+    let texto = '';
+    if (message.conversation) {
+      texto = message.conversation;
+    } else if (message.extendedTextMessage?.text) {
+      texto = message.extendedTextMessage.text;
+    } else if (message.imageMessage?.caption) {
+      texto = message.imageMessage.caption;
+    } else {
+      texto = '[Mensagem de tipo não suportado]';
+    }
+
+    console.log(`\n✅ Mensagem processada:`);
+    console.log(`   De: ${numero} (${pushName || 'Desconhecido'})`);
+    console.log(`   Texto: "${texto}"`);
+
+    // ========================================
+    // 💾 REGISTRAR NO FIREBASE (ENTRADA)
+    // ========================================
+
+    if (db) {
+      try {
+        await db.collection('whatsappMessages').add({
+          numero,
+          nome: pushName || 'Desconhecido',
+          mensagem: texto,
+          timestamp: new Date(messageTimestamp * 1000),
+          tipo: 'entrada',
+          status: 'recebida',
+          chaveOriginal: key,
+          remoteJid
         });
-
-        // Busca resposta
-        const resposta = await buscarResposta(textoMensagem);
-
-        if (resposta) {
-            console.log(`✅ Resposta encontrada`);
-            
-            // Aguarda 1 segundo (mais natural)
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Envia resposta
-            await enviarMensagemWhatsApp(remetente, resposta);
-            console.log('✉️ Resposta enviada!\n');
-        } else {
-            console.log('❌ Nenhuma resposta encontrada');
-            
-            // Resposta padrão
-            const respostaPadrao = `Olá! 👋\n\nDesculpe, não encontrei uma resposta exata para sua pergunta.\n\nTem algo mais específico que posso ajudar?`;
-            await enviarMensagemWhatsApp(remetente, respostaPadrao);
-            console.log('📤 Resposta padrão enviada!\n');
-        }
-
-        res.json({ received: true, processed: true });
-
-    } catch (error) {
-        console.error('❌ Erro ao processar webhook:', error);
-        res.status(200).json({ received: true, error: error.message });
+        console.log('💾 Mensagem salva em Firebase');
+      } catch (firebaseError) {
+        console.error('❌ Erro ao salvar em Firebase:', firebaseError.message);
+      }
     }
-});
 
-// ================================
-// ENDPOINT: Conectar WhatsApp
-// ================================
+    // ========================================
+    // 🔍 BUSCAR RESPOSTA
+    // ========================================
 
-app.post('/api/whatsapp/connect', async (req, res) => {
+    let resposta = await buscarResposta(texto);
+
+    if (!resposta) {
+      resposta = '👋 Olá! Recebi sua mensagem. Verificando as opções disponíveis...';
+    }
+
+    console.log(`💬 Resposta: "${resposta}"`);
+
+    // ========================================
+    // 📤 ENVIAR RESPOSTA VIA EVOLUTION
+    // ========================================
+
     try {
-        console.log('🔄 Iniciando conexão WhatsApp...');
+      await enviarMensagemWhatsApp(numero, resposta);
+      console.log('✅ Resposta enviada com sucesso');
+    } catch (sendError) {
+      console.error('❌ Erro ao enviar resposta:', sendError.message);
+      // Não falha o webhook se enviar falhar, apenas loga
+    }
 
-        const response = await evolutionClient.post(`/instance/create`, {
-            instanceName: EVOLUTION_INSTANCE,
-            token: EVOLUTION_API_KEY,
-            webhook_url: `${process.env.WEBHOOK_URL || 'http://localhost:3000'}/webhook/messages`,
-            webhook_by_events: true
+    // ========================================
+    // 💾 REGISTRAR RESPOSTA NO FIREBASE
+    // ========================================
+
+    if (db) {
+      try {
+        await db.collection('whatsappMessages').add({
+          numero,
+          nome: pushName || 'Desconhecido',
+          mensagem: resposta,
+          timestamp: new Date(),
+          tipo: 'saida',
+          status: 'enviada'
         });
-
-        console.log('✅ Instância criada/conectada');
-
-        await db.collection('config').doc('whatsapp').set({
-            status: 'conectando',
-            ultimaAtualizacao: new Date(),
-            bot: 'ativo'
-        }, { merge: true });
-
-        res.json({ success: true, instance: EVOLUTION_INSTANCE });
-
-    } catch (error) {
-        console.error('❌ Erro ao conectar:', error.message);
-        res.status(500).json({ error: error.message });
+        console.log('💾 Resposta salva em Firebase');
+      } catch (firebaseError) {
+        console.error('❌ Erro ao salvar resposta:', firebaseError.message);
+      }
     }
+
+    console.log('✅ ===== WEBHOOK PROCESSADO =====\n');
+
+    // Responder ao webhook imediatamente
+    res.json({
+      success: true,
+      message: 'Webhook processado com sucesso',
+      numero,
+      respostaEnviada: true
+    });
+
+  } catch (error) {
+    console.error('❌ ERRO CRÍTICO NO WEBHOOK:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      type: error.constructor.name
+    });
+  }
 });
 
-// ================================
-// ENDPOINT: Obter QR Code
-// ================================
+// ========================================
+// 🔍 FUNÇÃO: Buscar Resposta no Firebase
+// ========================================
 
-app.get('/api/whatsapp/qr', async (req, res) => {
-    try {
-        const response = await evolutionClient.get(`/instance/fetchInstances/${EVOLUTION_INSTANCE}`);
+async function buscarResposta(textoMensagem) {
+  if (!db) {
+    console.log('⚠️ Firebase não está conectado, retornando resposta padrão');
+    return null;
+  }
 
-        const instance = response.data;
-        const qrCode = instance?.qrCode?.base64;
+  try {
+    const snapshot = await db
+      .collection('respostas')
+      .where('ativa', '==', true)
+      .get();
 
-        if (qrCode) {
-            res.json({ 
-                hasQR: true, 
-                qrCode: qrCode,
-                status: 'scanning'
-            });
-        } else {
-            res.json({ 
-                hasQR: false, 
-                status: 'connected',
-                message: 'WhatsApp já está conectado'
-            });
-        }
+    console.log(`🔍 Buscando resposta em ${snapshot.size} registros`);
 
-    } catch (error) {
-        console.error('❌ Erro ao obter QR:', error.message);
-        res.status(500).json({ error: error.message });
+    for (const doc of snapshot.docs) {
+      const { palavrasChave, resposta } = doc.data();
+
+      if (!palavrasChave || !Array.isArray(palavrasChave)) continue;
+
+      // Verificar se alguma palavra-chave está na mensagem
+      const match = palavrasChave.some(palavra =>
+        textoMensagem.toLowerCase().includes(palavra.toLowerCase())
+      );
+
+      if (match) {
+        console.log(`✅ Resposta encontrada para: ${textoMensagem}`);
+        return resposta;
+      }
     }
-});
 
-// ================================
-// ENDPOINT: Status da conexão
-// ================================
+    console.log('ℹ️ Nenhuma resposta encontrada na base');
+    return null;
 
-app.get('/api/whatsapp/status', async (req, res) => {
-    try {
-        const response = await evolutionClient.get(`/instance/fetchInstances/${EVOLUTION_INSTANCE}`);
-        
-        const instance = response.data;
-        const status = instance?.instanceStatus || 'unknown';
-        const conectado = status === 'open' || status === 'connected';
+  } catch (error) {
+    console.error('❌ Erro ao buscar resposta:', error.message);
+    return null;
+  }
+}
 
-        await db.collection('config').doc('whatsapp').set({
-            status: conectado ? 'conectado' : 'desconectado',
-            ultimaAtualizacao: new Date(),
-            bot: conectado ? 'ativo' : 'inativo'
-        }, { merge: true });
+// ========================================
+// 📤 FUNÇÃO: Enviar Mensagem WhatsApp
+// ========================================
 
-        res.json({ 
-            connected: conectado,
-            status: status,
-            instance: EVOLUTION_INSTANCE
-        });
+async function enviarMensagemWhatsApp(numero, mensagem) {
+  try {
+    console.log(`📤 Enviando para ${numero}...`);
 
-    } catch (error) {
-        console.error('❌ Erro ao verificar status:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
+    const response = await axios.post(
+      `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
+      {
+        number: numero,
+        text: mensagem,
+        delay: 1000 // 1 segundo de delay para parecer natural
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${EVOLUTION_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 segundos de timeout
+      }
+    );
 
-// ================================
-// ENDPOINT: Desconectar
-// ================================
+    console.log(`✅ Mensagem enviada: ${response.data.key || response.status}`);
+    return response.data;
 
-app.post('/api/whatsapp/disconnect', async (req, res) => {
-    try {
-        console.log('🛑 Desconectando WhatsApp...');
+  } catch (error) {
+    console.error('❌ Erro ao enviar mensagem via Evolution:', {
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+    throw error;
+  }
+}
 
-        await evolutionClient.delete(`/instance/delete/${EVOLUTION_INSTANCE}`);
-
-        await db.collection('config').doc('whatsapp').set({
-            status: 'desconectado',
-            ultimaAtualizacao: new Date(),
-            bot: 'inativo'
-        }, { merge: true });
-
-        res.json({ success: true, message: 'Desconectado' });
-
-    } catch (error) {
-        console.error('❌ Erro ao desconectar:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ================================
-// ENDPOINT: Enviar mensagem (teste)
-// ================================
+// ========================================
+// 📝 ENDPOINT: Enviar Mensagem Manual
+// ========================================
 
 app.post('/api/whatsapp/send', async (req, res) => {
-    try {
-        const { numero, mensagem } = req.body;
+  try {
+    const { numero, mensagem } = req.body;
 
-        if (!numero || !mensagem) {
-            return res.status(400).json({ error: 'Número e mensagem são obrigatórios' });
-        }
-
-        await enviarMensagemWhatsApp(numero, mensagem);
-
-        res.json({ success: true, message: 'Mensagem enviada' });
-
-    } catch (error) {
-        console.error('❌ Erro ao enviar:', error.message);
-        res.status(500).json({ error: error.message });
+    if (!numero || !mensagem) {
+      return res.status(400).json({ error: 'Número e mensagem são obrigatórios' });
     }
+
+    await enviarMensagemWhatsApp(numero, mensagem);
+
+    res.json({
+      success: true,
+      message: 'Mensagem enviada com sucesso'
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// ================================
-// FUNÇÕES AUXILIARES
-// ================================
+// ========================================
+// 📋 ENDPOINT: Listar Mensagens Recebidas
+// ========================================
 
-async function enviarMensagemWhatsApp(numero, texto) {
-    try {
-        const response = await evolutionClient.post(`/message/sendText/${EVOLUTION_INSTANCE}`, {
-            number: numero,
-            text: texto
-        });
-
-        console.log('📤 Mensagem enviada para WhatsApp');
-        return response.data;
-
-    } catch (error) {
-        console.error('❌ Erro ao enviar para WhatsApp:', error.message);
-        throw error;
+app.get('/api/whatsapp/messages', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ error: 'Firebase não está conectado' });
     }
-}
 
-async function buscarResposta(perguntaUsuario) {
-    try {
-        const snapshot = await db.collection('perguntas-respostas').get();
-        
-        if (snapshot.empty) {
-            console.log('⚠️ Nenhuma pergunta cadastrada');
-            return null;
-        }
+    const snapshot = await db
+      .collection('whatsappMessages')
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .get();
 
-        const perguntaLower = perguntaUsuario.toLowerCase().trim();
-        
-        for (const doc of snapshot.docs) {
-            const data = doc.data();
-            const perguntaBD = data.pergunta.toLowerCase();
-            
-            // Correspondência exata
-            if (perguntaBD === perguntaLower) {
-                return data.resposta;
-            }
-            
-            // Correspondência parcial
-            const palavrasUsuario = perguntaLower.split(' ').filter(p => p.length > 2);
-            const palavrasBD = perguntaBD.split(' ');
-            
-            let matches = 0;
-            for (const palavra of palavrasUsuario) {
-                if (palavrasBD.some(p => p.includes(palavra))) {
-                    matches++;
-                }
-            }
-            
-            if (palavrasUsuario.length > 0 && matches / palavrasUsuario.length >= 0.6) {
-                return data.resposta;
-            }
-        }
-        
-        return null;
-    } catch (error) {
-        console.error('Erro ao buscar resposta:', error);
-        return null;
-    }
-}
+    const mensagens = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      mensagens.push({
+        id: doc.id,
+        ...data,
+        timestamp: data.timestamp ? data.timestamp.toDate() : null
+      });
+    });
 
-async function registrarAtendimento(dados) {
-    try {
-        await db.collection('atendimentos').add({
-            whatsapp: dados.whatsapp,
-            ultimaMensagem: dados.mensagem,
-            data: dados.data,
-            resolvido: false
-        });
-        
-        console.log('✅ Atendimento registrado');
-    } catch (error) {
-        console.error('Erro ao registrar atendimento:', error);
-    }
-}
+    res.json({ mensagens });
 
-// ================================
-// INICIAR SERVIDOR
-// ================================
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// 📊 ENDPOINT: Status do Sistema
+// ========================================
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    server: 'OK',
+    firebase: db ? 'connected' : 'disabled',
+    evolution: {
+      url: EVOLUTION_API_URL,
+      instance: EVOLUTION_INSTANCE
+    },
+    webhook_url: WEBHOOK_URL,
+    timestamp: new Date()
+  });
+});
+
+// ========================================
+// 404 - Rota não encontrada
+// ========================================
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Rota não encontrada',
+    method: req.method,
+    path: req.path,
+    disponivel: [
+      'GET /health',
+      'GET /api/status',
+      'POST /webhook/messages',
+      'POST /api/whatsapp/send',
+      'GET /api/whatsapp/messages'
+    ]
+  });
+});
+
+// ========================================
+// ⚠️ ERROR HANDLER
+// ========================================
+
+app.use((error, req, res, next) => {
+  console.error('❌ Erro não tratado:', error);
+  res.status(500).json({
+    error: 'Erro interno do servidor',
+    message: error.message
+  });
+});
+
+// ========================================
+// 🚀 INICIAR SERVIDOR
+// ========================================
 
 app.listen(PORT, () => {
-    console.log('\n🚀 Backend ialorichat iniciado!');
-    console.log(`🌐 Servidor rodando em: http://localhost:${PORT}`);
-    console.log(`📍 Webhook em: /webhook/messages`);
-    console.log(`⚙️ Evolution API: ${EVOLUTION_API_URL}`);
-    console.log(`🔑 Instância: ${EVOLUTION_INSTANCE}\n`);
+  console.log(`
+╔════════════════════════════════════════╗
+║   🚀 SERVIDOR INICIADO COM SUCESSO    ║
+╚════════════════════════════════════════╝
+
+   🔌 Porta: ${PORT}
+   🌍 URL: http://localhost:${PORT}
+   📋 Health: GET /health
+   💬 Webhook: POST /webhook/messages
+   
+Aguardando mensagens do WhatsApp...
+  `);
 });
 
-export default app;
+// ========================================
+// Exportar para testes
+// ========================================
+
+module.exports = { app, enviarMensagemWhatsApp, buscarResposta };
