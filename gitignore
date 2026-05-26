@@ -1,77 +1,96 @@
-events {
-    worker_connections 1024;
-}
+# ========================================
+# VARIÁVEIS DE AMBIENTE (CRÍTICO!)
+# ========================================
+.env
+.env.local
+.env.*.local
+.env.production.local
 
-http {
-    upstream backend {
-        server backend:3000;
-    }
+# ========================================
+# NODE.JS
+# ========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+.node_repl_history
+package-lock.json
+yarn.lock
 
-    upstream evolution {
-        server evolution:8080;
-    }
+# ========================================
+# FIREBASE & CREDENCIAIS (CRÍTICO!)
+# ========================================
+firebase-key.json
+firebase-adminsdk-*.json
+*.key
+serviceAccountKey.json
 
-    server {
-        listen 80;
-        server_name _;
-        client_max_body_size 50M;
+# ========================================
+# BUILD & DIST
+# ========================================
+dist/
+build/
+.next/
+.nuxt/
+out/
+coverage/
+.nyc_output/
 
-        # ================================
-        # BACKEND ROUTES
-        # ================================
-        
-        location /api/ {
-            proxy_pass http://backend;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_cache_bypass $http_upgrade;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
+# ========================================
+# IDEs & EDITORES
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.sublime-workspace
+.sublime-project
 
-        location /webhook/ {
-            proxy_pass http://backend;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
+# ========================================
+# OS FILES
+# ========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-        location /health {
-            proxy_pass http://backend;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-        }
+# ========================================
+# LOGS
+# ========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
-        # ================================
-        # EVOLUTION API ROUTES
-        # ================================
+# ========================================
+# TEMP FILES
+# ========================================
+tmp/
+temp/
+*.tmp
+.cache/
 
-        location /evolution/ {
-            proxy_pass http://evolution/;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_cache_bypass $http_upgrade;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
+# ========================================
+# TESTING
+# ========================================
+coverage/
+.nyc_output/
+*.lcov
+.mocha_output
 
-        # ================================
-        # PAINEL ADMIN (via GitHub Pages)
-        # ================================
-
-        location / {
-            proxy_pass https://leandroctr.github.io/1chat.digital/;
-            proxy_ssl_verify off;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-    }
-}
+# ========================================
+# SISTEMA DE ARQUIVOS
+# ========================================
+.DS_Store
+Thumbs.db
