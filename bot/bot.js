@@ -1,15 +1,16 @@
-// ================================
-// BOT WHATSAPP - IALORICHAT (BAILEYS)
-// Node.js + Baileys + Firebase
-// Funciona perfeitamente no Railway!
-// ================================
+import {
+    default as makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason
+} from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import admin from 'firebase-admin';
+import QRCode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-const firebase = require('firebase-admin');
-const QRCode = require('qrcode');
-const fs = require('fs');
-const path = require('path');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ================================
 // CONFIGURAÇÃO FIREBASE
@@ -22,12 +23,12 @@ if (!serviceAccount.project_id) {
     process.exit(1);
 }
 
-firebase.initializeApp({
-    credential: firebase.credential.cert(serviceAccount),
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
     projectId: serviceAccount.project_id
 });
 
-const db = firebase.firestore();
+const db = admin.firestore();
 
 // ================================
 // DIRETÓRIO DE SESSÃO
@@ -60,12 +61,12 @@ async function conectarWhatsApp() {
         if (qr) {
             console.log('\n📱 GERANDO QR CODE...\n');
             
-            // Exibir QR Code no terminal
-            QRCode.toString(qr, { type: 'terminal' }, (err, string) => {
-                if (!err) {
-                    console.log(string);
-                }
-            });
+            try {
+                const qrString = await QRCode.toString(qr, { type: 'terminal' });
+                console.log(qrString);
+            } catch (err) {
+                console.log('QR Code gerado! Escaneie com seu WhatsApp');
+            }
 
             console.log('\n✅ Escaneie o código acima com WhatsApp');
             console.log('🔗 Menu → Aparelhos Conectados → Conectar Aparelho\n');
@@ -75,7 +76,6 @@ async function conectarWhatsApp() {
             console.log('✅ BOT CONECTADO E PRONTO!');
             console.log('🤖 Aguardando mensagens...\n');
 
-            // Atualiza status no Firebase
             await db.collection('config').doc('whatsapp').set({
                 status: 'conectado',
                 ultimaConexao: new Date(),
@@ -94,7 +94,6 @@ async function conectarWhatsApp() {
             } else {
                 console.log('❌ Login expirado. Escaneie QR Code novamente.\n');
                 
-                // Limpa sessão
                 if (fs.existsSync(sessionsDir)) {
                     fs.rmSync(sessionsDir, { recursive: true });
                 }
@@ -113,7 +112,7 @@ async function conectarWhatsApp() {
 
         if (!message.message) return;
         if (message.key.fromMe) return;
-        if (message.key.remoteJid.includes('g.us')) return; // Ignora grupos
+        if (message.key.remoteJid.includes('g.us')) return;
 
         try {
             const conversaId = message.key.remoteJid;
@@ -123,29 +122,24 @@ async function conectarWhatsApp() {
             console.log(`\n📨 Nova mensagem de: ${conversaId}`);
             console.log(`📝 Conteúdo: ${textoMensagem}`);
 
-            // Registra atendimento
             await registrarAtendimento({
                 whatsapp: conversaId,
                 mensagem: textoMensagem,
                 data: new Date()
             });
 
-            // Busca resposta
             const resposta = await buscarResposta(textoMensagem);
 
             if (resposta) {
                 console.log(`✅ Resposta encontrada`);
                 
-                // Aguarda 1 segundo (mais natural)
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Responde
                 await sock.sendMessage(conversaId, { text: resposta });
                 console.log('✉️ Resposta enviada!\n');
             } else {
                 console.log('❌ Nenhuma resposta encontrada');
                 
-                // Resposta padrão
                 const respostaPadrao = `Olá! 👋\n\nDesculpe, não encontrei uma resposta exata para sua pergunta.\n\nTem algo mais específico que posso ajudar?`;
                 await sock.sendMessage(conversaId, { text: respostaPadrao });
                 console.log('📤 Resposta padrão enviada!\n');
@@ -156,7 +150,6 @@ async function conectarWhatsApp() {
         }
     });
 
-    // Salva credenciais
     sock.ev.on('creds.update', saveCreds);
 
     return sock;
@@ -177,17 +170,14 @@ async function buscarResposta(perguntaUsuario) {
 
         const perguntaLower = perguntaUsuario.toLowerCase().trim();
         
-        // Procura por correspondência exata ou parcial
         for (const doc of snapshot.docs) {
             const data = doc.data();
             const perguntaBD = data.pergunta.toLowerCase();
             
-            // Correspondência exata
             if (perguntaBD === perguntaLower) {
                 return data.resposta;
             }
             
-            // Correspondência parcial (palavras-chave)
             const palavrasUsuario = perguntaLower.split(' ').filter(p => p.length > 2);
             const palavrasBD = perguntaBD.split(' ');
             
@@ -198,7 +188,6 @@ async function buscarResposta(perguntaUsuario) {
                 }
             }
             
-            // Se 60% das palavras correspondem
             if (palavrasUsuario.length > 0 && matches / palavrasUsuario.length >= 0.6) {
                 return data.resposta;
             }
