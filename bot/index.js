@@ -1,6 +1,6 @@
 const express = require('express');
 const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const QRCode = require('qrcode');
 const P = require('pino');
@@ -13,12 +13,17 @@ let connectionStatus = 'connecting';
 
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('./sessions');
+  const { version } = await fetchLatestBaileysVersion();
+console.log('Usando versão WhatsApp Web:', version);
 
 const sock = makeWASocket({
+  version,
   auth: state,
   logger: P({ level: 'debug' }),
-  browser: ['Mac OS', 'Chrome', '122.0.0.0'],
-  printQRInTerminal: false
+  browser: ['Ubuntu', 'Chrome', '122.0.0.0'],
+  printQRInTerminal: false,
+  syncFullHistory: false,
+  markOnlineOnConnect: false
 });
 
   sock.ev.on('creds.update', saveCreds);
