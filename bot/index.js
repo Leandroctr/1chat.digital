@@ -14,10 +14,12 @@ let connectionStatus = 'connecting';
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState('./sessions');
 
-  const sock = makeWASocket({
-    auth: state,
-    logger: P({ level: 'debug' })
-  });
+const sock = makeWASocket({
+  auth: state,
+  logger: P({ level: 'debug' }),
+  browser: ['Mac OS', 'Chrome', '122.0.0.0'],
+  printQRInTerminal: false
+});
 
   sock.ev.on('creds.update', saveCreds);
 
