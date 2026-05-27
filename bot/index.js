@@ -16,7 +16,7 @@ async function startWhatsApp() {
 
   const sock = makeWASocket({
     auth: state,
-    logger: P({ level: 'silent' })
+    logger: P({ level: 'debug' })
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -42,7 +42,12 @@ async function startWhatsApp() {
       const shouldReconnect =
         new Boom(lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
 
-      console.log('Conexão fechada. Reconectar:', shouldReconnect);
+     console.log(
+  'Conexão fechada:',
+  lastDisconnect?.error,
+  'Reconectar:',
+  shouldReconnect
+);
 
       if (shouldReconnect) {
         startWhatsApp();
