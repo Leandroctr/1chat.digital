@@ -1,0 +1,12 @@
+node_modules/
+npm-debug.log
+.env
+.DS_Store
+
+logs/*.log
+sessions/
+
+.codex-server.pid
+.codex-server.job
+.server.out.log
+.server.err.log
