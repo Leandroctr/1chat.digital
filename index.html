@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1Chat Digital | Atendimento</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">1C</div>
+        <div>
+          <h1>1Chat</h1>
+          <span>Central de atendimento</span>
+        </div>
+      </div>
+
+      <nav>
+        <a class="active">Fila</a>
+        <a>Atendimentos</a>
+        <a>Perguntas</a>
+        <a>Relatórios</a>
+        <a>Logs</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span>Sistema local</span>
+        <strong>Online</strong>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Operação de suporte</p>
+          <h2>Fila de atendimento humano</h2>
+          <span>Gerencie clientes que solicitaram operador.</span>
+        </div>
+
+        <button class="primary" onclick="carregarFila()">Atualizar fila</button>
+      </header>
+
+      <section class="metrics">
+        <div class="metric-card">
+          <span>Na fila</span>
+          <strong id="totalFila">0</strong>
+          <small>Aguardando operador</small>
+        </div>
+
+        <div class="metric-card">
+          <span>Status bot</span>
+          <strong class="green">Online</strong>
+          <small>WAHA + Node local</small>
+        </div>
+
+        <div class="metric-card">
+          <span>Modo humano</span>
+          <strong id="totalHumano">0</strong>
+          <small>Automação pausada</small>
+        </div>
+
+        <div class="metric-card">
+          <span>Atualização</span>
+          <strong id="ultimaAtualizacao">--:--</strong>
+          <small>Atualiza a cada 10s</small>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Atendimentos aguardando</h3>
+            <p>O operador responde pelo WhatsApp. Aqui ele apenas encerra o atendimento.</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>CPF</th>
+                <th>Site</th>
+                <th>Última mensagem</th>
+                <th>Horário</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="filaBody">
+              <tr>
+                <td colspan="7" class="empty">Carregando fila...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
