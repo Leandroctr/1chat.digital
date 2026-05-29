@@ -95,6 +95,51 @@ function normalizarTexto(texto) {
     .trim();
 }
 
+function limparCpf(cpf) {
+  return String(cpf || "").replace(/\D/g, "");
+}
+
+function validarCpf(cpf) {
+  const cpfLimpo = limparCpf(cpf);
+
+  if (cpfLimpo.length !== 11) {
+    return false;
+  }
+
+  if (/^(\d)\1{10}$/.test(cpfLimpo)) {
+    return false;
+  }
+
+  const calcularDigito = (tamanho) => {
+    let soma = 0;
+
+    for (let i = 0; i < tamanho; i += 1) {
+      soma += Number(cpfLimpo[i]) * (tamanho + 1 - i);
+    }
+
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+
+  const primeiroDigito = calcularDigito(9);
+  const segundoDigito = calcularDigito(10);
+
+  return (
+    primeiroDigito === Number(cpfLimpo[9]) &&
+    segundoDigito === Number(cpfLimpo[10])
+  );
+}
+
+function formatarCpf(cpf) {
+  const cpfLimpo = limparCpf(cpf);
+
+  if (cpfLimpo.length !== 11) {
+    return cpf;
+  }
+
+  return `${cpfLimpo.slice(0, 3)}.${cpfLimpo.slice(3, 6)}.${cpfLimpo.slice(6, 9)}-${cpfLimpo.slice(9)}`;
+}
+
 function dataAtual() {
   return new Date().toISOString().split("T")[0];
 }
@@ -965,11 +1010,36 @@ app.post(
         atendimento.etapa ===
         "aguardando_cpf"
       ) {
+        const cpfLimpo = limparCpf(
+          mensagemTexto
+        );
+
+        if (
+          !validarCpf(
+            cpfLimpo
+          )
+        ) {
+          await enviarMensagem(
+            numero,
+            "CPF invÃ¡lido. Por favor, informe um CPF vÃ¡lido com 11 nÃºmeros."
+          );
+
+          escreverLog(
+            `CPF INVALIDO | ${numero} | ${mensagemTexto}`
+          );
+
+          return res.sendStatus(
+            200
+          );
+        }
+
         await atualizarAtendimento(
           numero,
           {
             cpf:
-              mensagemTexto,
+              formatarCpf(
+                cpfLimpo
+              ),
             etapa:
               "aguardando_site",
           }
