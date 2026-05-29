@@ -3,6 +3,7 @@ const axios = require("axios");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
+const { Pool } = require("pg");
 
 const app = express();
 
@@ -26,6 +27,12 @@ const PORT = process.env.PORT || 3000;
 const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://localhost:3001";
 const WAHA_API_KEY = process.env.WAHA_API_KEY || "123456";
 const SESSION = process.env.WAHA_SESSION || "default";
+const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
+const pool = USAR_POSTGRES
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+    })
+  : null;
 
 const mensagensProcessadas = new Set();
 
@@ -138,6 +145,70 @@ function salvarJson(caminho, dados) {
   );
 }
 
+async function initDb() {
+  if (!USAR_POSTGRES) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS atendimentos (
+      numero TEXT PRIMARY KEY,
+      modo TEXT NOT NULL DEFAULT 'bot',
+      etapa TEXT NOT NULL DEFAULT 'inicio',
+      nome TEXT,
+      cpf TEXT,
+      site TEXT,
+      criado_em TIMESTAMPTZ DEFAULT NOW(),
+      atualizado_em TIMESTAMPTZ DEFAULT NOW(),
+      iniciado_em TIMESTAMPTZ
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fila (
+      id SERIAL PRIMARY KEY,
+      numero TEXT UNIQUE NOT NULL,
+      nome TEXT,
+      cpf TEXT,
+      site TEXT,
+      mensagem TEXT,
+      horario TIMESTAMPTZ DEFAULT NOW(),
+      status TEXT NOT NULL DEFAULT 'aguardando'
+    );
+  `);
+}
+
+function mapearAtendimento(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    modo: row.modo,
+    etapa: row.etapa,
+    nome: row.nome,
+    cpf: row.cpf,
+    site: row.site,
+    criadoEm: row.criado_em,
+    atualizadoEm: row.atualizado_em,
+    iniciadoEm: row.iniciado_em,
+  };
+}
+
+function mapearItemFila(row) {
+  return {
+    numero: row.numero,
+    nome: row.nome,
+    cpf: row.cpf,
+    site: row.site,
+    mensagem: row.mensagem,
+    horario: row.horario
+      ? new Date(row.horario).toLocaleString("pt-BR")
+      : null,
+    status: row.status,
+  };
+}
+
 // ==============================
 // RESPOSTAS EXCEL
 // ==============================
@@ -204,27 +275,88 @@ function buscarResposta(
 // ATENDIMENTOS
 // ==============================
 
-function carregarAtendimentos() {
+async function carregarAtendimentos() {
+  if (USAR_POSTGRES) {
+    const { rows } = await pool.query(
+      "SELECT * FROM atendimentos"
+    );
+
+    return rows.reduce((acc, row) => {
+      acc[row.numero] = mapearAtendimento(row);
+      return acc;
+    }, {});
+  }
+
   return carregarJson(
     ARQUIVO_ATENDIMENTOS,
     {}
   );
 }
 
-function salvarAtendimentos(
+async function salvarAtendimentos(
   dados
 ) {
+  if (USAR_POSTGRES) {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM atendimentos");
+
+      for (const [numero, atendimento] of Object.entries(dados)) {
+        await client.query(
+          `INSERT INTO atendimentos
+            (numero, modo, etapa, nome, cpf, site, criado_em, atualizado_em, iniciado_em)
+           VALUES
+            ($1, $2, $3, $4, $5, $6, COALESCE($7, NOW()), NOW(), $8)`,
+          [
+            numero,
+            atendimento.modo || "bot",
+            atendimento.etapa || "inicio",
+            atendimento.nome || null,
+            atendimento.cpf || null,
+            atendimento.site || null,
+            atendimento.criadoEm || null,
+            atendimento.iniciadoEm || null,
+          ]
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return;
+  }
+
   salvarJson(
     ARQUIVO_ATENDIMENTOS,
     dados
   );
 }
 
-function obterOuCriarAtendimento(
+async function obterOuCriarAtendimento(
   numero
 ) {
+  if (USAR_POSTGRES) {
+    const { rows } = await pool.query(
+      `INSERT INTO atendimentos (numero)
+       VALUES ($1)
+       ON CONFLICT (numero) DO UPDATE
+       SET numero = EXCLUDED.numero
+       RETURNING *`,
+      [numero]
+    );
+
+    return mapearAtendimento(rows[0]);
+  }
+
   const atendimentos =
-    carregarAtendimentos();
+    await carregarAtendimentos();
 
   if (!atendimentos[numero]) {
     atendimentos[numero] = {
@@ -239,7 +371,7 @@ function obterOuCriarAtendimento(
         horarioAtual(),
     };
 
-    salvarAtendimentos(
+    await salvarAtendimentos(
       atendimentos
     );
   }
@@ -247,12 +379,48 @@ function obterOuCriarAtendimento(
   return atendimentos[numero];
 }
 
-function atualizarAtendimento(
+async function atualizarAtendimento(
   numero,
   novosDados
 ) {
+  if (USAR_POSTGRES) {
+    const atendimentoAtual =
+      await obterOuCriarAtendimento(
+        numero
+      );
+
+    const atendimento = {
+      ...atendimentoAtual,
+      ...novosDados,
+    };
+
+    const { rows } = await pool.query(
+      `UPDATE atendimentos
+       SET modo = $2,
+           etapa = $3,
+           nome = $4,
+           cpf = $5,
+           site = $6,
+           atualizado_em = NOW(),
+           iniciado_em = COALESCE($7, iniciado_em)
+       WHERE numero = $1
+       RETURNING *`,
+      [
+        numero,
+        atendimento.modo || "bot",
+        atendimento.etapa || "inicio",
+        atendimento.nome || null,
+        atendimento.cpf || null,
+        atendimento.site || null,
+        atendimento.iniciadoEm || null,
+      ]
+    );
+
+    return mapearAtendimento(rows[0]);
+  }
+
   const atendimentos =
-    carregarAtendimentos();
+    await carregarAtendimentos();
 
   atendimentos[numero] = {
     ...(atendimentos[numero] ||
@@ -262,18 +430,27 @@ function atualizarAtendimento(
       horarioAtual(),
   };
 
-  salvarAtendimentos(
+  await salvarAtendimentos(
     atendimentos
   );
 
   return atendimentos[numero];
 }
 
-function estaEmModoHumano(
+async function estaEmModoHumano(
   numero
 ) {
+  if (USAR_POSTGRES) {
+    const { rows } = await pool.query(
+      "SELECT modo FROM atendimentos WHERE numero = $1",
+      [numero]
+    );
+
+    return rows[0]?.modo === "humano";
+  }
+
   const atendimentos =
-    carregarAtendimentos();
+    await carregarAtendimentos();
 
   return (
     atendimentos[numero]
@@ -281,10 +458,10 @@ function estaEmModoHumano(
   );
 }
 
-function ativarModoHumano(
+async function ativarModoHumano(
   numero
 ) {
-  atualizarAtendimento(
+  await atualizarAtendimento(
     numero,
     {
       modo: "humano",
@@ -299,26 +476,108 @@ function ativarModoHumano(
 // FILA
 // ==============================
 
-function carregarFila() {
+async function carregarFila() {
+  if (USAR_POSTGRES) {
+    const { rows } = await pool.query(
+      `SELECT numero, nome, cpf, site, mensagem, horario, status
+       FROM fila
+       ORDER BY horario ASC`
+    );
+
+    return rows.map(mapearItemFila);
+  }
+
   return carregarJson(
     ARQUIVO_FILA,
     []
   );
 }
 
-function salvarFila(fila) {
+async function salvarFila(fila) {
+  if (USAR_POSTGRES) {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM fila");
+
+      for (const item of fila) {
+        await client.query(
+          `INSERT INTO fila
+            (numero, nome, cpf, site, mensagem, horario, status)
+           VALUES
+            ($1, $2, $3, $4, $5, COALESCE($6, NOW()), $7)
+           ON CONFLICT (numero) DO UPDATE
+           SET nome = EXCLUDED.nome,
+               cpf = EXCLUDED.cpf,
+               site = EXCLUDED.site,
+               mensagem = EXCLUDED.mensagem,
+               horario = EXCLUDED.horario,
+               status = EXCLUDED.status`,
+          [
+            item.numero,
+            item.nome || null,
+            item.cpf || null,
+            item.site || null,
+            item.mensagem || null,
+            item.horario || null,
+            item.status || "aguardando",
+          ]
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return;
+  }
+
   salvarJson(
     ARQUIVO_FILA,
     fila
   );
 }
 
-function adicionarNaFila(
+async function adicionarNaFila(
   numero,
   mensagem
 ) {
+  if (USAR_POSTGRES) {
+    const atendimento =
+      await obterOuCriarAtendimento(
+        numero
+      );
+
+    await pool.query(
+      `INSERT INTO fila
+        (numero, nome, cpf, site, mensagem, status)
+       VALUES
+        ($1, $2, $3, $4, $5, 'aguardando')
+       ON CONFLICT (numero) DO UPDATE
+       SET nome = EXCLUDED.nome,
+           cpf = EXCLUDED.cpf,
+           site = EXCLUDED.site,
+           mensagem = EXCLUDED.mensagem,
+           status = 'aguardando'`,
+      [
+        numero,
+        atendimento.nome || null,
+        atendimento.cpf || null,
+        atendimento.site || null,
+        mensagem,
+      ]
+    );
+
+    return;
+  }
+
   const fila =
-    carregarFila();
+    await carregarFila();
 
   const jaExiste = fila.find(
     (item) =>
@@ -333,7 +592,7 @@ function adicionarNaFila(
   }
 
   const atendimento =
-    obterOuCriarAtendimento(
+    await obterOuCriarAtendimento(
       numero
     );
 
@@ -354,7 +613,7 @@ function adicionarNaFila(
     status: "aguardando",
   });
 
-  salvarFila(fila);
+  await salvarFila(fila);
 }
 
 // ==============================
@@ -416,9 +675,9 @@ app.get(
 
 app.get(
   "/api/fila",
-  (req, res) => {
+  async (req, res) => {
     const fila =
-      carregarFila();
+      await carregarFila();
 
     res.json(fila);
   }
@@ -426,7 +685,7 @@ app.get(
 
 app.post(
   "/api/fila/encerrar",
-  (req, res) => {
+  async (req, res) => {
     const { numero } =
       req.body;
 
@@ -439,30 +698,42 @@ app.post(
         });
     }
 
-    // Remove da fila
-    const fila =
-      carregarFila();
-
-    const novaFila =
-      fila.filter(
-        (item) =>
-          item.numero !==
-          numero
+    if (USAR_POSTGRES) {
+      await pool.query(
+        "DELETE FROM fila WHERE numero = $1",
+        [numero]
       );
 
-    salvarFila(novaFila);
+      await pool.query(
+        "DELETE FROM atendimentos WHERE numero = $1",
+        [numero]
+      );
+    } else {
+      // Remove da fila
+      const fila =
+        await carregarFila();
 
-    // Remove atendimento
-    const atendimentos =
-      carregarAtendimentos();
+      const novaFila =
+        fila.filter(
+          (item) =>
+            item.numero !==
+            numero
+        );
 
-    delete atendimentos[
-      numero
-    ];
+      await salvarFila(novaFila);
 
-    salvarAtendimentos(
-      atendimentos
-    );
+      // Remove atendimento
+      const atendimentos =
+        await carregarAtendimentos();
+
+      delete atendimentos[
+        numero
+      ];
+
+      await salvarAtendimentos(
+        atendimentos
+      );
+    }
 
     escreverLog(
       `ATENDIMENTO ENCERRADO | ${numero}`
@@ -582,7 +853,7 @@ app.post(
       );
 
       const atendimento =
-        obterOuCriarAtendimento(
+        await obterOuCriarAtendimento(
           numero
         );
 
@@ -591,7 +862,7 @@ app.post(
       // ==============================
 
       if (
-        estaEmModoHumano(
+        await estaEmModoHumano(
           numero
         )
       ) {
@@ -612,7 +883,7 @@ app.post(
         atendimento.etapa ===
         "inicio"
       ) {
-        atualizarAtendimento(
+        await atualizarAtendimento(
           numero,
           {
             etapa:
@@ -642,7 +913,7 @@ app.post(
         atendimento.etapa ===
         "aguardando_nome"
       ) {
-        atualizarAtendimento(
+        await atualizarAtendimento(
           numero,
           {
             nome:
@@ -674,7 +945,7 @@ app.post(
         atendimento.etapa ===
         "aguardando_cpf"
       ) {
-        atualizarAtendimento(
+        await atualizarAtendimento(
           numero,
           {
             cpf:
@@ -706,7 +977,7 @@ app.post(
         atendimento.etapa ===
         "aguardando_site"
       ) {
-        atualizarAtendimento(
+        await atualizarAtendimento(
           numero,
           {
             site:
@@ -751,11 +1022,11 @@ app.post(
         );
 
       if (pediuHumano) {
-        ativarModoHumano(
+        await ativarModoHumano(
           numero
         );
 
-        adicionarNaFila(
+        await adicionarNaFila(
           numero,
           mensagemTexto
         );
@@ -839,20 +1110,32 @@ app.post(
 // START
 // ==============================
 
-app.listen(PORT, () => {
-  console.log(
-    "================================="
-  );
+async function start() {
+  await initDb();
 
-  console.log(
-    "BOT ONLINE"
-  );
+  app.listen(PORT, () => {
+    console.log(
+      "================================="
+    );
 
-  console.log(
-    `http://localhost:${PORT}`
-  );
+    console.log(
+      "BOT ONLINE"
+    );
 
-  console.log(
-    "================================="
+    console.log(
+      `http://localhost:${PORT}`
+    );
+
+    console.log(
+      "================================="
+    );
+  });
+}
+
+start().catch((error) => {
+  console.error(
+    "ERRO AO INICIAR"
   );
+  console.error(error);
+  process.exit(1);
 });
