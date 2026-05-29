@@ -103,6 +103,24 @@ function horarioAtual() {
   return new Date().toLocaleString("pt-BR");
 }
 
+function dataBanco(valor) {
+  if (!valor) {
+    return null;
+  }
+
+  if (valor instanceof Date) {
+    return valor;
+  }
+
+  const data = new Date(valor);
+
+  if (Number.isNaN(data.getTime())) {
+    return null;
+  }
+
+  return data;
+}
+
 function escreverLog(texto) {
   garantirPasta(PASTA_LOGS);
 
@@ -316,8 +334,8 @@ async function salvarAtendimentos(
             atendimento.nome || null,
             atendimento.cpf || null,
             atendimento.site || null,
-            atendimento.criadoEm || null,
-            atendimento.iniciadoEm || null,
+            dataBanco(atendimento.criadoEm),
+            dataBanco(atendimento.iniciadoEm),
           ]
         );
       }
@@ -412,7 +430,7 @@ async function atualizarAtendimento(
         atendimento.nome || null,
         atendimento.cpf || null,
         atendimento.site || null,
-        atendimento.iniciadoEm || null,
+        dataBanco(atendimento.iniciadoEm),
       ]
     );
 
@@ -467,7 +485,9 @@ async function ativarModoHumano(
       modo: "humano",
       etapa: "humano",
       iniciadoEm:
-        horarioAtual(),
+        USAR_POSTGRES
+          ? new Date()
+          : horarioAtual(),
     }
   );
 }
@@ -520,7 +540,7 @@ async function salvarFila(fila) {
             item.cpf || null,
             item.site || null,
             item.mensagem || null,
-            item.horario || null,
+            dataBanco(item.horario),
             item.status || "aguardando",
           ]
         );
