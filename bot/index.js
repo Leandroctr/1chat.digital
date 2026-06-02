@@ -5,6 +5,11 @@ const path = require("path");
 const fs = require("fs");
 const { Pool } = require("pg");
 const { validarCPF } = require("./validador-cpf");
+const leitorRespostas = require("./leitor-respostas");
+
+
+// Carregar base de respostas
+leitorRespostas.carregarPlanilha();
 
 const app = express();
 
