@@ -966,11 +966,29 @@ app.post(
         atendimento.etapa ===
         "aguardando_cpf"
       ) {
+        // Validar CPF
+        const validacao = validarCPF(mensagemTexto);
+
+        if (!validacao.valido) {
+          // CPF inválido - pedir novamente
+          await enviarMensagem(
+            numero,
+            `❌ ${validacao.mensagem}\n\nPor favor, informe um CPF válido (apenas números).`
+          );
+
+          escreverLog(
+            `CPF INVÁLIDO | ${numero} | ${mensagemTexto}`
+          );
+
+          return res.sendStatus(200);
+        }
+
+        // CPF válido - salvar e continuar
         await atualizarAtendimento(
           numero,
           {
             cpf:
-              mensagemTexto,
+              validacao.cpfFormatado,
             etapa:
               "aguardando_site",
           }
@@ -978,11 +996,11 @@ app.post(
 
         await enviarMensagem(
           numero,
-          "Obrigado. Agora informe em qual site ou plataforma você estava."
+          "✅ CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma você estava."
         );
 
         escreverLog(
-          `CPF SALVO | ${numero} | ${mensagemTexto}`
+          `CPF SALVO | ${numero} | ${validacao.cpfFormatado}`
         );
 
         return res.sendStatus(
