@@ -4,6 +4,7 @@ const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
 const { Pool } = require("pg");
+const { validarCPF } = require("./validador-cpf");
 
 const app = express();
 
