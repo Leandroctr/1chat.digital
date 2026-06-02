@@ -44,6 +44,7 @@ const mensagensProcessadas = new Set();
 
 const ARQUIVO_RESPOSTAS = path.join(
   __dirname,
+  "data",
   "respostas.xlsx"
 );
 
