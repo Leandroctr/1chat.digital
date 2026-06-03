@@ -36,8 +36,15 @@ const pool = USAR_POSTGRES
   : null;
 
 const mensagensProcessadas = new Set();
+const aguardandoMensagemFinal = new Map();
+const mensagensFinaisEnviadas = new Set();
 
 const ARQUIVO_RESPOSTAS = path.join(__dirname, "data", "respostas.xlsx");
+const ARQUIVO_CONFIG = path.join(
+  __dirname,
+  "data",
+  "config.json"
+);
 const PASTA_LOGS = path.join(__dirname, "logs");
 const ARQUIVO_ATENDIMENTOS = path.join(__dirname, "data", "atendimentos.json");
 const ARQUIVO_FILA = path.join(__dirname, "data", "fila.json");
@@ -104,7 +111,18 @@ function salvarJson(caminho, dados) {
   garantirPasta(path.dirname(caminho));
   fs.writeFileSync(caminho, JSON.stringify(dados, null, 2), "utf8");
 }
+function carregarConfig() {
 
+  return carregarJson(
+    ARQUIVO_CONFIG,
+    {
+      mensagem_final_ativa: false,
+      mensagem_final: "",
+      delay_mensagem_final_segundos: 20,
+    }
+  );
+
+}
 async function initDb() {
   if (!USAR_POSTGRES) return;
 
