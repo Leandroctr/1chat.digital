@@ -529,11 +529,72 @@ async function encaminharParaHumano(numero, mensagemTexto) {
   await adicionarNaFila(numero, mensagemTexto);
   escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
 
+await enviarMensagem(numero, resposta);
+
+if (linkVideo) {
+  await enviarMensagem(numero, linkVideo);
+}
+
+const config = carregarConfig();
+
+if (
+  config.mensagem_final_ativa &&
+  config.mensagem_final
+) {
+
   await enviarMensagem(
     numero,
-    "Seu atendimento foi encaminhado para um operador. Aguarde por favor."
+    "Te ajudo em algo mais?"
   );
+
+  const chaveHoje =
+    `${numero}-${dataAtual()}`;
+
+  if (
+    !mensagensFinaisEnviadas.has(
+      chaveHoje
+    )
+  ) {
+
+    const timer = setTimeout(
+      async () => {
+
+        try {
+
+          await enviarMensagem(
+            numero,
+            config.mensagem_final
+          );
+
+          mensagensFinaisEnviadas.add(
+            chaveHoje
+          );
+
+        } catch (erro) {
+
+          console.error(
+            "ERRO MSG FINAL",
+            erro.message
+          );
+
+        }
+
+      },
+      (
+        config.delay_mensagem_final_segundos || 20
+      ) * 1000
+    );
+
+    aguardandoMensagemFinal.set(
+      numero,
+      timer
+    );
+
+  }
+
 }
+
+return res.sendStatus(200);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
