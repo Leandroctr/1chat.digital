@@ -1095,10 +1095,20 @@ app.post(
       // RESPOSTA AUTOMÁTICA
       // ==============================
 
-      const resposta =
-        buscarResposta(
-          mensagemTexto
-        );
+     let resposta =
+  buscarResposta(
+    mensagemTexto
+  );
+
+if (
+  !resposta ||
+  resposta.includes("Recebi sua mensagem")
+) {
+  resposta =
+    await perguntarIA(
+      mensagemTexto
+    );
+}
 
       escreverLog(
         `RESPOSTA | ${numero} | ${resposta}`
