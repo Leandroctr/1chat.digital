@@ -189,6 +189,13 @@ function extrairTermos(item) {
     .filter(Boolean);
 }
 
+function limparLinksDoTexto(texto) {
+  return String(texto || "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buscarResposta(mensagemCliente) {
   const mensagemNormalizada = normalizarTexto(mensagemCliente);
   const respostas = carregarRespostas();
@@ -210,10 +217,14 @@ function buscarResposta(mensagemCliente) {
     const prioridade = Number(item.prioridade || 0);
 
     if (!melhorResposta || prioridade > melhorPrioridade) {
+      const linkVideo = item.link_video ? String(item.link_video).trim() : null;
+
       melhorPrioridade = prioridade;
       melhorResposta = {
-        texto: String(item.resposta).trim(),
-        linkVideo: item.link_video ? String(item.link_video).trim() : null,
+        texto: linkVideo
+          ? limparLinksDoTexto(item.resposta)
+          : String(item.resposta).trim(),
+        linkVideo,
       };
     }
   }
