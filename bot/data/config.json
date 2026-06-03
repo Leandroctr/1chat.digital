@@ -1,5 +1,5 @@
 {
-  "mensagem_promocional_ativa": true,
-  "mensagem_promocional": "🎁 Antes de você ir...\n\nTemos um sorteio especial nesta semana!\n\nPremiação: R$ 5.000\nCartela: R$ 10\n\nBoa sorte 🍀",
-  "delay_promocional_segundos": 20
+  "mensagem_final_ativa": true,
+  "mensagem_final": "",
+  "delay_mensagem_final_segundos": 20
 }
