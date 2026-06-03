@@ -1,5 +1,6 @@
 const express = require("express");
 const axios = require("axios");
+const { perguntarIA } = require("./ia");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
