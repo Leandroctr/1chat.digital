@@ -285,17 +285,21 @@ function buscarResposta(
     )
       continue;
 
-    if (
-      mensagemNormalizada.includes(
-        gatilho
-      )
-    ) {
-      return item.resposta;
-    }
-  }
-
-  return "Olá! Recebi sua mensagem. Em breve vou te responder por aqui.";
+  if (
+  mensagemNormalizada.includes(
+    gatilho
+  )
+) {
+  return {
+    texto: item.resposta,
+    linkVideo: item.link_video || null,
+  };
 }
+
+ return {
+  texto: "Olá! Recebi sua mensagem. Em breve vou te responder por aqui.",
+  linkVideo: null,
+};
 
 // ==============================
 // ATENDIMENTOS
@@ -1095,10 +1099,16 @@ app.post(
       // RESPOSTA AUTOMÁTICA
       // ==============================
 
-     let resposta =
+ let respostaEncontrada =
   buscarResposta(
     mensagemTexto
   );
+
+let resposta =
+  respostaEncontrada.texto;
+
+let linkVideo =
+  respostaEncontrada.linkVideo;
 
 if (
   !resposta ||
@@ -1108,6 +1118,8 @@ if (
     await perguntarIA(
       mensagemTexto
     );
+
+  linkVideo = null;
 }
 
       escreverLog(
@@ -1127,6 +1139,12 @@ if (
         resposta
       );
 
+      if (linkVideo) {
+  await enviarMensagem(
+    numero,
+    linkVideo
+  );
+}
       return res.sendStatus(
         200
       );
