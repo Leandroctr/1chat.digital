@@ -1,5 +1,5 @@
 {
-  "mensagem_final_ativa": true,
+  "mensagem_final_ativa": false,
   "mensagem_final": "",
   "delay_mensagem_final_segundos": 20
 }
