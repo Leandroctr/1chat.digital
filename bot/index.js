@@ -39,19 +39,11 @@ const mensagensProcessadas = new Set();
 const timersMensagemFinal = new Map();
 
 const ARQUIVO_RESPOSTAS = path.join(__dirname, "data", "respostas.xlsx");
-const ARQUIVO_CONFIG = path.join(
-  __dirname,
-  "data",
-  "config.json"
-);
+const ARQUIVO_CONFIG = path.join(__dirname, "data", "config.json");
 const PASTA_LOGS = path.join(__dirname, "logs");
 const ARQUIVO_ATENDIMENTOS = path.join(__dirname, "data", "atendimentos.json");
 const ARQUIVO_FILA = path.join(__dirname, "data", "fila.json");
-const ARQUIVO_FINAL_MESSAGE_LOG = path.join(
-  __dirname,
-  "data",
-  "final-message-log.json"
-);
+const ARQUIVO_FINAL_MESSAGE_LOG = path.join(__dirname, "data", "final-message-log.json");
 
 const CONFIG_PADRAO = {
   mensagem_final_ativa: false,
@@ -202,21 +194,11 @@ function carregarRespostas() {
 function extrairTermos(item) {
   const termos = [];
 
-  if (item.gatilho) {
-    termos.push(String(item.gatilho));
-  }
+  if (item.gatilho) termos.push(String(item.gatilho));
+  if (item.gatilhos) termos.push(String(item.gatilhos));
+  if (item.sinonimos) termos.push(...String(item.sinonimos).split(/[;|,]/));
 
-  if (item.gatilhos) {
-    termos.push(String(item.gatilhos));
-  }
-
-  if (item.sinonimos) {
-    termos.push(...String(item.sinonimos).split(/[;|,]/));
-  }
-
-  return termos
-    .map((termo) => normalizarTexto(termo))
-    .filter(Boolean);
+  return termos.map((termo) => normalizarTexto(termo)).filter(Boolean);
 }
 
 function limparLinksDoTexto(texto) {
@@ -251,9 +233,7 @@ function buscarResposta(mensagemCliente) {
 
       melhorPrioridade = prioridade;
       melhorResposta = {
-        texto: linkVideo
-          ? limparLinksDoTexto(item.resposta)
-          : String(item.resposta).trim(),
+        texto: linkVideo ? limparLinksDoTexto(item.resposta) : String(item.resposta).trim(),
         linkVideo,
       };
     }
@@ -262,7 +242,7 @@ function buscarResposta(mensagemCliente) {
   if (melhorResposta) return melhorResposta;
 
   return {
-    texto: "OlÃ¡! Recebi sua mensagem. Em breve vou te responder por aqui.",
+    texto: "Olá! Recebi sua mensagem. Em breve vou te responder por aqui.",
     linkVideo: null,
   };
 }
@@ -561,14 +541,11 @@ function normalizarConfig(config) {
     mensagem_final_ativa: Boolean(config?.mensagem_final_ativa),
     mensagem_final: String(config?.mensagem_final || ""),
     pergunta_confirmacao_final: String(
-      config?.pergunta_confirmacao_final ||
-        CONFIG_PADRAO.pergunta_confirmacao_final
+      config?.pergunta_confirmacao_final || CONFIG_PADRAO.pergunta_confirmacao_final
     ),
     delay_mensagem_final_segundos: Math.max(
       0,
-      Number.isNaN(delayInformado)
-        ? CONFIG_PADRAO.delay_mensagem_final_segundos
-        : delayInformado
+      Number.isNaN(delayInformado) ? CONFIG_PADRAO.delay_mensagem_final_segundos : delayInformado
     ),
   };
 }
@@ -593,11 +570,7 @@ function salvarConfig(config) {
     }
   }
 
-  const novaConfig = normalizarConfig({
-    ...configAtual,
-    ...configPermitida,
-  });
-
+  const novaConfig = normalizarConfig({ ...configAtual, ...configPermitida });
   salvarJson(ARQUIVO_CONFIG, novaConfig);
   return novaConfig;
 }
@@ -697,9 +670,7 @@ function usuarioConfirmouEncerramento(mensagemNormalizada) {
   }
 
   const respostasPorTrecho = ["obrigado", "obrigada"];
-  return respostasPorTrecho.some((resposta) =>
-    mensagemNormalizada.includes(resposta)
-  );
+  return respostasPorTrecho.some((resposta) => mensagemNormalizada.includes(resposta));
 }
 
 function pediuOperador(mensagemNormalizada) {
@@ -744,7 +715,7 @@ app.post("/api/fila/encerrar", async (req, res) => {
   const { numero } = req.body;
 
   if (!numero) {
-    return res.status(400).json({ erro: "NÃºmero nÃ£o informado" });
+    return res.status(400).json({ erro: "Número não informado" });
   }
 
   await removerDaFila(numero);
@@ -799,11 +770,7 @@ app.post("/webhook", async (req, res) => {
         return res.sendStatus(200);
       }
 
-      await atualizarAtendimento(numero, {
-        modo: "bot",
-        etapa: "liberado",
-      });
-
+      await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
       atendimento.modo = "bot";
       atendimento.etapa = "liberado";
       escreverLog(`ENCERRAMENTO CANCELADO | ${numero} | ${mensagemTexto}`);
@@ -821,7 +788,7 @@ app.post("/webhook", async (req, res) => {
 
     if (atendimento.etapa === "inicio") {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-      await enviarMensagem(numero, "OlÃ¡! Para iniciar o atendimento, informe seu nome.");
+      await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
       escreverLog(`PEDIU NOME | ${numero}`);
       return res.sendStatus(200);
     }
@@ -843,10 +810,10 @@ app.post("/webhook", async (req, res) => {
       if (!validacao.valido) {
         await enviarMensagem(
           numero,
-          `âŒ ${validacao.mensagem}\n\nPor favor, informe um CPF vÃ¡lido (apenas nÃºmeros).`
+          `❌ ${validacao.mensagem}\n\nPor favor, informe um CPF válido (apenas números).`
         );
 
-        escreverLog(`CPF INVÃLIDO | ${numero} | ${mensagemTexto}`);
+        escreverLog(`CPF INVÁLIDO | ${numero} | ${mensagemTexto}`);
         return res.sendStatus(200);
       }
 
@@ -857,7 +824,7 @@ app.post("/webhook", async (req, res) => {
 
       await enviarMensagem(
         numero,
-        "âœ… CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma vocÃª estava."
+        "✅ CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma você estava."
       );
 
       escreverLog(`CPF SALVO | ${numero} | ${validacao.cpfFormatado}`);
@@ -872,6 +839,20 @@ app.post("/webhook", async (req, res) => {
 
       await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
       escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+      return res.sendStatus(200);
+    }
+
+    if (atendimento.etapa === "liberado" && (!atendimento.nome || !atendimento.cpf || !atendimento.site)) {
+      await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
+      await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+      escreverLog(`CADASTRO INCOMPLETO | PEDIU NOME | ${numero}`);
+      return res.sendStatus(200);
+    }
+
+    if (atendimento.etapa !== "liberado") {
+      await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
+      await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+      escreverLog(`ETAPA INVALIDA | PEDIU NOME | ${numero}`);
       return res.sendStatus(200);
     }
 
@@ -927,4 +908,3 @@ start().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-
