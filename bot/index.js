@@ -64,7 +64,7 @@ const CONFIG_PADRAO = {
   mensagem_final_ativa: false,
   mensagem_final: "",
   delay_mensagem_final_segundos: 20,
-  pergunta_confirmacao_final: "Te ajudo em algo mais?",
+  pergunta_confirmacao_final: "Posso te ajudar com algo mais?",
   final_message_image_url: "",
   final_message_image_path: "",
   final_message_image_mime: "",
@@ -705,7 +705,10 @@ async function registrarMensagemFinalEnviada(numero) {
 async function enviarMensagemFinal(numero) {
   const config = carregarConfig();
 
-  if (!config.mensagem_final_ativa || !config.mensagem_final.trim()) {
+  if (
+    !config.mensagem_final_ativa ||
+    (!config.final_message_image_url && !config.mensagem_final.trim())
+  ) {
     escreverLog(`MENSAGEM FINAL DESATIVADA | ${numero}`);
     return false;
   }
@@ -715,16 +718,28 @@ async function enviarMensagemFinal(numero) {
     return false;
   }
 
+  let enviouAlgo = false;
+
   if (config.final_message_image_url) {
     try {
       await enviarImagem(numero, config.final_message_image_url);
+      enviouAlgo = true;
       escreverLog(`IMAGEM MENSAGEM FINAL ENVIADA | ${numero}`);
     } catch (error) {
       escreverLog(`ERRO IMAGEM MENSAGEM FINAL | ${numero} | ${error.message}`);
     }
   }
 
-  await enviarMensagem(numero, config.mensagem_final);
+  if (config.mensagem_final.trim()) {
+    await enviarMensagem(numero, config.mensagem_final);
+    enviouAlgo = true;
+  }
+
+  if (!enviouAlgo) {
+    escreverLog(`MENSAGEM FINAL NAO ENVIADA | ${numero}`);
+    return false;
+  }
+
   await registrarMensagemFinalEnviada(numero);
   escreverLog(`MENSAGEM FINAL ENVIADA | ${numero}`);
   return true;
@@ -754,6 +769,55 @@ async function iniciarFluxoEncerramento(numero) {
       escreverLog(`ENCERRAMENTO AUTOMÁTICO | ${numero}`);
     } catch (error) {
       escreverLog(`ERRO MENSAGEM FINAL AUTOMÁTICA | ${numero} | ${error.message}`);
+    }
+  }, config.delay_mensagem_final_segundos * 1000);
+
+  timersMensagemFinal.set(numero, timer);
+}
+
+async function iniciarFluxoPosResposta(numero) {
+  if (timersMensagemFinal.has(numero)) {
+    escreverLog(`TIMER POS RESPOSTA JA EXISTE | ${numero}`);
+    return;
+  }
+
+  if (await estaEmModoHumano(numero)) {
+    escreverLog(`POS RESPOSTA IGNORADO MODO HUMANO | ${numero}`);
+    return;
+  }
+
+  const atendimento = await obterOuCriarAtendimento(numero);
+
+  if (atendimento?.etapa !== "liberado") {
+    escreverLog(`POS RESPOSTA IGNORADO ETAPA | ${numero} | ${atendimento?.etapa || "sem_atendimento"}`);
+    return;
+  }
+
+  const config = carregarConfig();
+
+  if (
+    !config.mensagem_final_ativa ||
+    (!config.final_message_image_url && !config.mensagem_final.trim())
+  ) {
+    escreverLog(`POS RESPOSTA IGNORADO MENSAGEM FINAL DESATIVADA | ${numero}`);
+    return;
+  }
+
+  await atualizarAtendimento(numero, {
+    modo: "bot",
+    etapa: "aguardando_confirmacao_pos_resposta",
+  });
+  await enviarMensagem(numero, config.pergunta_confirmacao_final);
+
+  const timer = setTimeout(async () => {
+    timersMensagemFinal.delete(numero);
+
+    try {
+      await enviarMensagemFinal(numero);
+      await limparAtendimento(numero);
+      escreverLog(`POS RESPOSTA FINALIZADO AUTOMATICO | ${numero}`);
+    } catch (error) {
+      escreverLog(`ERRO POS RESPOSTA AUTOMATICO | ${numero} | ${error.message}`);
     }
   }, config.delay_mensagem_final_segundos * 1000);
 
@@ -954,6 +1018,22 @@ app.post("/webhook", async (req, res) => {
       escreverLog(`ENCERRAMENTO CANCELADO | ${numero} | ${mensagemTexto}`);
     }
 
+    if (atendimento.etapa === "aguardando_confirmacao_pos_resposta") {
+      cancelarTimerMensagemFinal(numero);
+
+      if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
+        await enviarMensagemFinal(numero);
+        await limparAtendimento(numero);
+        escreverLog(`POS RESPOSTA ENCERRADO PELO USUARIO | ${numero}`);
+        return res.sendStatus(200);
+      }
+
+      await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
+      atendimento.modo = "bot";
+      atendimento.etapa = "liberado";
+      escreverLog(`POS RESPOSTA CONTINUOU ATENDIMENTO | ${numero} | ${mensagemTexto}`);
+    }
+
     if (await estaEmModoHumano(numero)) {
       escreverLog(`MODO HUMANO | ${numero}`);
       return res.sendStatus(200);
@@ -1047,6 +1127,7 @@ app.post("/webhook", async (req, res) => {
         await enviarMensagem(numero, PERGUNTA_VIDEO);
       }
 
+      await iniciarFluxoPosResposta(numero);
       return res.sendStatus(200);
     }
 
@@ -1058,6 +1139,7 @@ app.post("/webhook", async (req, res) => {
       if (respostaIA) {
         escreverLog(`RESPOSTA | ${numero} | ${respostaIA}`);
         await enviarMensagem(numero, respostaIA);
+        await iniciarFluxoPosResposta(numero);
         return res.sendStatus(200);
       }
     } catch (errorIA) {
