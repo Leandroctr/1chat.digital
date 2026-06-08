@@ -99,7 +99,7 @@ const uploadImagemMensagemFinal = multer({
 });
 
 const PERGUNTA_VIDEO =
-  "O video resolveu sua duvida? Se ainda precisar, posso encaminhar para uma operadora.";
+  "O vídeo resolveu sua dúvida? Se ainda precisar, posso encaminhar para uma operadora.";
 
 function garantirPasta(caminho) {
   if (!fs.existsSync(caminho)) {
