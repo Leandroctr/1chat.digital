@@ -6,6 +6,7 @@ const fs = require("fs");
 const multer = require("multer");
 const { Pool } = require("pg");
 const { createClient } = require("@supabase/supabase-js");
+const WebSocket = require("ws");
 const { validarCPF } = require("./validador-cpf");
 const { perguntarIA } = require("./ia");
 
@@ -38,7 +39,11 @@ const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "finalmessageassets";
 
 const supabase =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        realtime: {
+          transport: WebSocket,
+        },
+      })
     : null;
 
 const pool = USAR_POSTGRES
