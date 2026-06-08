@@ -618,11 +618,15 @@ async function enviarImagem(numero, imageUrl) {
     {
       session: SESSION,
       chatId: numero,
-      file: imageUrl,
+      file: {
+        url: imageUrl,
+      },
       caption: "",
     },
     {
-      headers: { "X-Api-Key": WAHA_API_KEY },
+      headers: {
+        "X-Api-Key": WAHA_API_KEY,
+      },
     }
   );
 }
