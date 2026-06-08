@@ -181,6 +181,10 @@ nav a:hover {
   overflow: hidden;
 }
 
+.config-panel {
+  margin-bottom: 24px;
+}
+
 .panel-header {
   padding: 24px 26px;
   border-bottom: 1px solid var(--line);
@@ -193,6 +197,83 @@ nav a:hover {
 
 .panel-header p {
   margin: 0;
+}
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 26px;
+}
+
+.config-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.config-form input,
+.config-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  padding: 12px 14px;
+  outline: none;
+}
+
+.config-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.config-form input:focus,
+.config-form textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.checkbox-row {
+  align-items: center;
+  flex-direction: row !important;
+  color: var(--text) !important;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 18px;
+}
+
+.config-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.status-message {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.status-message.success {
+  color: var(--green);
+}
+
+.status-message.error {
+  color: var(--red);
 }
 
 .table-wrap {
@@ -270,6 +351,10 @@ td {
 @media (max-width: 1100px) {
   .metrics {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .config-grid {
+    grid-template-columns: 1fr;
   }
 
   .sidebar {

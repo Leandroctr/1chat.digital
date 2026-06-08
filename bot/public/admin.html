@@ -68,6 +68,44 @@
         </div>
       </section>
 
+      <section class="panel config-panel">
+        <div class="panel-header">
+          <div>
+            <h3>Mensagem final</h3>
+            <p>Configure a mensagem enviada somente ao encerrar o atendimento humano.</p>
+          </div>
+        </div>
+
+        <form class="config-form" onsubmit="salvarConfig(event)">
+          <label class="checkbox-row">
+            <input type="checkbox" id="mensagemFinalAtiva" />
+            <span>Ativar mensagem final</span>
+          </label>
+
+          <label>
+            <span>Mensagem final</span>
+            <textarea id="mensagemFinal" rows="4" placeholder="Digite a mensagem final"></textarea>
+          </label>
+
+          <div class="config-grid">
+            <label>
+              <span>Pergunta de confirmação</span>
+              <input id="perguntaConfirmacaoFinal" type="text" placeholder="Te ajudo em algo mais?" />
+            </label>
+
+            <label>
+              <span>Delay em segundos</span>
+              <input id="delayMensagemFinal" type="number" min="0" step="1" />
+            </label>
+          </div>
+
+          <div class="config-actions">
+            <button class="primary" type="submit">Salvar configuração</button>
+            <span id="configStatus" class="status-message"></span>
+          </div>
+        </form>
+      </section>
+
       <section class="panel">
         <div class="panel-header">
           <div>

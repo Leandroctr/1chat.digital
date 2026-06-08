@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const axios = require("axios");
 const XLSX = require("xlsx");
 const path = require("path");
@@ -36,8 +36,7 @@ const pool = USAR_POSTGRES
   : null;
 
 const mensagensProcessadas = new Set();
-const aguardandoMensagemFinal = new Map();
-const mensagensFinaisEnviadas = new Set();
+const timersMensagemFinal = new Map();
 
 const ARQUIVO_RESPOSTAS = path.join(__dirname, "data", "respostas.xlsx");
 const ARQUIVO_CONFIG = path.join(
@@ -48,6 +47,18 @@ const ARQUIVO_CONFIG = path.join(
 const PASTA_LOGS = path.join(__dirname, "logs");
 const ARQUIVO_ATENDIMENTOS = path.join(__dirname, "data", "atendimentos.json");
 const ARQUIVO_FILA = path.join(__dirname, "data", "fila.json");
+const ARQUIVO_FINAL_MESSAGE_LOG = path.join(
+  __dirname,
+  "data",
+  "final-message-log.json"
+);
+
+const CONFIG_PADRAO = {
+  mensagem_final_ativa: false,
+  mensagem_final: "",
+  delay_mensagem_final_segundos: 20,
+  pergunta_confirmacao_final: "Te ajudo em algo mais?",
+};
 
 function garantirPasta(caminho) {
   if (!fs.existsSync(caminho)) {
@@ -66,6 +77,8 @@ function garantirArquivoJson(caminho, padrao) {
 garantirPasta(PASTA_LOGS);
 garantirArquivoJson(ARQUIVO_ATENDIMENTOS, {});
 garantirArquivoJson(ARQUIVO_FILA, []);
+garantirArquivoJson(ARQUIVO_CONFIG, CONFIG_PADRAO);
+garantirArquivoJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
 
 function normalizarTexto(texto) {
   return String(texto || "")
@@ -111,18 +124,7 @@ function salvarJson(caminho, dados) {
   garantirPasta(path.dirname(caminho));
   fs.writeFileSync(caminho, JSON.stringify(dados, null, 2), "utf8");
 }
-function carregarConfig() {
 
-  return carregarJson(
-    ARQUIVO_CONFIG,
-    {
-      mensagem_final_ativa: false,
-      mensagem_final: "",
-      delay_mensagem_final_segundos: 20,
-    }
-  );
-
-}
 async function initDb() {
   if (!USAR_POSTGRES) return;
 
@@ -150,6 +152,16 @@ async function initDb() {
       mensagem TEXT,
       horario TIMESTAMPTZ DEFAULT NOW(),
       status TEXT NOT NULL DEFAULT 'aguardando'
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS final_message_log (
+      id SERIAL PRIMARY KEY,
+      numero TEXT NOT NULL,
+      sent_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      sent_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(numero, sent_date)
     );
   `);
 }
@@ -250,7 +262,7 @@ function buscarResposta(mensagemCliente) {
   if (melhorResposta) return melhorResposta;
 
   return {
-    texto: "Olá! Recebi sua mensagem. Em breve vou te responder por aqui.",
+    texto: "OlÃ¡! Recebi sua mensagem. Em breve vou te responder por aqui.",
     linkVideo: null,
   };
 }
@@ -400,6 +412,17 @@ async function ativarModoHumano(numero) {
   });
 }
 
+async function limparAtendimento(numero) {
+  if (USAR_POSTGRES) {
+    await pool.query("DELETE FROM atendimentos WHERE numero = $1", [numero]);
+    return;
+  }
+
+  const atendimentos = await carregarAtendimentos();
+  delete atendimentos[numero];
+  await salvarAtendimentos(atendimentos);
+}
+
 async function carregarFila() {
   if (USAR_POSTGRES) {
     const { rows } = await pool.query(
@@ -505,6 +528,16 @@ async function adicionarNaFila(numero, mensagem) {
   await salvarFila(fila);
 }
 
+async function removerDaFila(numero) {
+  if (USAR_POSTGRES) {
+    await pool.query("DELETE FROM fila WHERE numero = $1", [numero]);
+    return;
+  }
+
+  const fila = await carregarFila();
+  await salvarFila(fila.filter((item) => item.numero !== numero));
+}
+
 async function enviarMensagem(numero, texto) {
   await axios.post(
     `${WAHA_URL}/api/sendText`,
@@ -516,6 +549,156 @@ async function enviarMensagem(numero, texto) {
     {
       headers: { "X-Api-Key": WAHA_API_KEY },
     }
+  );
+}
+
+function normalizarConfig(config) {
+  const delayInformado = Number(config?.delay_mensagem_final_segundos);
+
+  return {
+    ...CONFIG_PADRAO,
+    ...config,
+    mensagem_final_ativa: Boolean(config?.mensagem_final_ativa),
+    mensagem_final: String(config?.mensagem_final || ""),
+    pergunta_confirmacao_final: String(
+      config?.pergunta_confirmacao_final ||
+        CONFIG_PADRAO.pergunta_confirmacao_final
+    ),
+    delay_mensagem_final_segundos: Math.max(
+      0,
+      Number.isNaN(delayInformado)
+        ? CONFIG_PADRAO.delay_mensagem_final_segundos
+        : delayInformado
+    ),
+  };
+}
+
+function carregarConfig() {
+  return normalizarConfig(carregarJson(ARQUIVO_CONFIG, CONFIG_PADRAO));
+}
+
+function salvarConfig(config) {
+  const configAtual = carregarConfig();
+  const configPermitida = {};
+  const camposPermitidos = [
+    "mensagem_final_ativa",
+    "mensagem_final",
+    "delay_mensagem_final_segundos",
+    "pergunta_confirmacao_final",
+  ];
+
+  for (const campo of camposPermitidos) {
+    if (Object.prototype.hasOwnProperty.call(config, campo)) {
+      configPermitida[campo] = config[campo];
+    }
+  }
+
+  const novaConfig = normalizarConfig({
+    ...configAtual,
+    ...configPermitida,
+  });
+
+  salvarJson(ARQUIVO_CONFIG, novaConfig);
+  return novaConfig;
+}
+
+async function podeEnviarMensagemFinal(numero) {
+  if (USAR_POSTGRES) {
+    const { rows } = await pool.query(
+      `SELECT 1
+       FROM final_message_log
+       WHERE numero = $1
+         AND sent_date = CURRENT_DATE
+       LIMIT 1`,
+      [numero]
+    );
+
+    return rows.length === 0;
+  }
+
+  const log = carregarJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
+  return log[numero] !== dataAtual();
+}
+
+async function registrarMensagemFinalEnviada(numero) {
+  if (USAR_POSTGRES) {
+    await pool.query(
+      `INSERT INTO final_message_log
+        (numero, sent_date)
+       VALUES
+        ($1, CURRENT_DATE)
+       ON CONFLICT (numero, sent_date)
+       DO NOTHING`,
+      [numero]
+    );
+
+    return;
+  }
+
+  const log = carregarJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
+  log[numero] = dataAtual();
+  salvarJson(ARQUIVO_FINAL_MESSAGE_LOG, log);
+}
+
+async function enviarMensagemFinal(numero) {
+  const config = carregarConfig();
+
+  if (!config.mensagem_final_ativa || !config.mensagem_final.trim()) {
+    escreverLog(`MENSAGEM FINAL DESATIVADA | ${numero}`);
+    return false;
+  }
+
+  if (!(await podeEnviarMensagemFinal(numero))) {
+    escreverLog(`MENSAGEM FINAL JA ENVIADA HOJE | ${numero}`);
+    return false;
+  }
+
+  await enviarMensagem(numero, config.mensagem_final);
+  await registrarMensagemFinalEnviada(numero);
+  escreverLog(`MENSAGEM FINAL ENVIADA | ${numero}`);
+  return true;
+}
+
+function cancelarTimerMensagemFinal(numero) {
+  const timer = timersMensagemFinal.get(numero);
+
+  if (timer) {
+    clearTimeout(timer);
+    timersMensagemFinal.delete(numero);
+  }
+}
+
+async function iniciarFluxoEncerramento(numero) {
+  cancelarTimerMensagemFinal(numero);
+
+  const config = carregarConfig();
+  await enviarMensagem(numero, config.pergunta_confirmacao_final);
+
+  const timer = setTimeout(async () => {
+    timersMensagemFinal.delete(numero);
+
+    try {
+      await enviarMensagemFinal(numero);
+      await limparAtendimento(numero);
+      escreverLog(`ENCERRAMENTO AUTOMATICO | ${numero}`);
+    } catch (error) {
+      escreverLog(`ERRO MENSAGEM FINAL AUTOMATICA | ${numero} | ${error.message}`);
+    }
+  }, config.delay_mensagem_final_segundos * 1000);
+
+  timersMensagemFinal.set(numero, timer);
+}
+
+function usuarioConfirmouEncerramento(mensagemNormalizada) {
+  const respostasExatas = ["nao", "n", "ok", "valeu", "tudo certo"];
+
+  if (respostasExatas.includes(mensagemNormalizada)) {
+    return true;
+  }
+
+  const respostasPorTrecho = ["obrigado", "obrigada"];
+  return respostasPorTrecho.some((resposta) =>
+    mensagemNormalizada.includes(resposta)
   );
 }
 
@@ -548,26 +731,30 @@ app.get("/api/fila", async (req, res) => {
   res.json(fila);
 });
 
+app.get("/api/config", (req, res) => {
+  res.json(carregarConfig());
+});
+
+app.post("/api/config", (req, res) => {
+  const config = salvarConfig(req.body || {});
+  res.json(config);
+});
+
 app.post("/api/fila/encerrar", async (req, res) => {
   const { numero } = req.body;
 
   if (!numero) {
-    return res.status(400).json({ erro: "Número não informado" });
+    return res.status(400).json({ erro: "NÃºmero nÃ£o informado" });
   }
 
-  if (USAR_POSTGRES) {
-    await pool.query("DELETE FROM fila WHERE numero = $1", [numero]);
-    await pool.query("DELETE FROM atendimentos WHERE numero = $1", [numero]);
-  } else {
-    const fila = await carregarFila();
-    await salvarFila(fila.filter((item) => item.numero !== numero));
+  await removerDaFila(numero);
+  await atualizarAtendimento(numero, {
+    modo: "bot",
+    etapa: "aguardando_confirmacao_final",
+  });
+  await iniciarFluxoEncerramento(numero);
 
-    const atendimentos = await carregarAtendimentos();
-    delete atendimentos[numero];
-    await salvarAtendimentos(atendimentos);
-  }
-
-  escreverLog(`ATENDIMENTO ENCERRADO | ${numero}`);
+  escreverLog(`FLUXO ENCERRAMENTO INICIADO | ${numero}`);
   return res.json({ ok: true });
 });
 
@@ -602,6 +789,26 @@ app.post("/webhook", async (req, res) => {
 
     const atendimento = await obterOuCriarAtendimento(numero);
 
+    if (atendimento.etapa === "aguardando_confirmacao_final") {
+      cancelarTimerMensagemFinal(numero);
+
+      if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
+        await enviarMensagemFinal(numero);
+        await limparAtendimento(numero);
+        escreverLog(`ENCERRAMENTO CONFIRMADO | ${numero}`);
+        return res.sendStatus(200);
+      }
+
+      await atualizarAtendimento(numero, {
+        modo: "bot",
+        etapa: "liberado",
+      });
+
+      atendimento.modo = "bot";
+      atendimento.etapa = "liberado";
+      escreverLog(`ENCERRAMENTO CANCELADO | ${numero} | ${mensagemTexto}`);
+    }
+
     if (await estaEmModoHumano(numero)) {
       escreverLog(`MODO HUMANO | ${numero}`);
       return res.sendStatus(200);
@@ -614,7 +821,7 @@ app.post("/webhook", async (req, res) => {
 
     if (atendimento.etapa === "inicio") {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-      await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+      await enviarMensagem(numero, "OlÃ¡! Para iniciar o atendimento, informe seu nome.");
       escreverLog(`PEDIU NOME | ${numero}`);
       return res.sendStatus(200);
     }
@@ -636,10 +843,10 @@ app.post("/webhook", async (req, res) => {
       if (!validacao.valido) {
         await enviarMensagem(
           numero,
-          `❌ ${validacao.mensagem}\n\nPor favor, informe um CPF válido (apenas números).`
+          `âŒ ${validacao.mensagem}\n\nPor favor, informe um CPF vÃ¡lido (apenas nÃºmeros).`
         );
 
-        escreverLog(`CPF INVÁLIDO | ${numero} | ${mensagemTexto}`);
+        escreverLog(`CPF INVÃLIDO | ${numero} | ${mensagemTexto}`);
         return res.sendStatus(200);
       }
 
@@ -650,7 +857,7 @@ app.post("/webhook", async (req, res) => {
 
       await enviarMensagem(
         numero,
-        "✅ CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma você estava."
+        "âœ… CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma vocÃª estava."
       );
 
       escreverLog(`CPF SALVO | ${numero} | ${validacao.cpfFormatado}`);
@@ -687,27 +894,6 @@ app.post("/webhook", async (req, res) => {
       await enviarMensagem(numero, linkVideo);
     }
 
-    const config = carregarConfig();
-
-    if (config.mensagem_final_ativa && config.mensagem_final) {
-      await enviarMensagem(numero, "Te ajudo em algo mais?");
-
-      const chaveHoje = `${numero}-${dataAtual()}`;
-
-      if (!mensagensFinaisEnviadas.has(chaveHoje)) {
-        const timer = setTimeout(async () => {
-          try {
-            await enviarMensagem(numero, config.mensagem_final);
-            mensagensFinaisEnviadas.add(chaveHoje);
-          } catch (erro) {
-            console.error("ERRO MSG FINAL", erro.message);
-          }
-        }, (config.delay_mensagem_final_segundos || 20) * 1000);
-
-        aguardandoMensagemFinal.set(numero, timer);
-      }
-    }
-
     return res.sendStatus(200);
   } catch (error) {
     escreverLog(`ERRO | ${error.message}`);
@@ -741,3 +927,4 @@ start().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
