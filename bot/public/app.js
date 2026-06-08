@@ -41,6 +41,33 @@ function mostrarStatusConfig(texto, tipo = "info") {
   status.className = `status-message ${tipo}`;
 }
 
+function mostrarStatusImagem(texto, tipo = "info") {
+  const status = document.getElementById("imageStatus");
+
+  if (!status) return;
+
+  status.textContent = texto;
+  status.className = `status-message ${tipo}`;
+}
+
+function atualizarPreviewImagem(config) {
+  const preview = document.getElementById("mensagemFinalImagePreview");
+  const vazio = document.getElementById("mensagemFinalImageEmpty");
+
+  if (!preview || !vazio) return;
+
+  if (config?.final_message_image_url) {
+    preview.src = config.final_message_image_url;
+    preview.hidden = false;
+    vazio.hidden = true;
+    return;
+  }
+
+  preview.removeAttribute("src");
+  preview.hidden = true;
+  vazio.hidden = false;
+}
+
 async function carregarConfig() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/config`);
@@ -55,7 +82,9 @@ async function carregarConfig() {
     document.getElementById("delayMensagemFinal").value =
       config.delay_mensagem_final_segundos ?? 20;
 
+    atualizarPreviewImagem(config);
     mostrarStatusConfig("");
+    mostrarStatusImagem("");
   } catch (error) {
     mostrarStatusConfig(
       "Não foi possível carregar a configuração.",
@@ -101,6 +130,7 @@ async function salvarConfig(event) {
       configSalva.pergunta_confirmacao_final || "Te ajudo em algo mais?";
     document.getElementById("delayMensagemFinal").value =
       configSalva.delay_mensagem_final_segundos ?? 20;
+    atualizarPreviewImagem(configSalva);
 
     mostrarStatusConfig("Configuração salva.", "success");
   } catch (error) {
@@ -108,6 +138,58 @@ async function salvarConfig(event) {
       "Não foi possível salvar a configuração.",
       "error"
     );
+  }
+}
+
+async function enviarImagemMensagemFinal() {
+  const input = document.getElementById("mensagemFinalImage");
+
+  if (!input?.files?.length) {
+    mostrarStatusImagem("Selecione uma imagem.", "error");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("image", input.files[0]);
+
+  try {
+    mostrarStatusImagem("Enviando imagem...");
+
+    const response = await fetch(`${API_BASE_URL}/api/config/final-message-image`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Erro ao enviar imagem");
+    }
+
+    const config = await response.json();
+    atualizarPreviewImagem(config);
+    input.value = "";
+    mostrarStatusImagem("Imagem salva.", "success");
+  } catch (error) {
+    mostrarStatusImagem("Nao foi possivel enviar a imagem.", "error");
+  }
+}
+
+async function removerImagemMensagemFinal() {
+  try {
+    mostrarStatusImagem("Removendo imagem...");
+
+    const response = await fetch(`${API_BASE_URL}/api/config/final-message-image`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error("Erro ao remover imagem");
+    }
+
+    const config = await response.json();
+    atualizarPreviewImagem(config);
+    mostrarStatusImagem("Imagem removida.", "success");
+  } catch (error) {
+    mostrarStatusImagem("Nao foi possivel remover a imagem.", "error");
   }
 }
 

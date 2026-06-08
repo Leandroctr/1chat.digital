@@ -3,7 +3,9 @@ const axios = require("axios");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
+const multer = require("multer");
 const { Pool } = require("pg");
+const { createClient } = require("@supabase/supabase-js");
 const { validarCPF } = require("./validador-cpf");
 const { perguntarIA } = require("./ia");
 
@@ -14,7 +16,7 @@ app.use((req, res, next) => {
   const allowedOrigin = process.env.CORS_ORIGIN || "*";
   res.header("Access-Control-Allow-Origin", allowedOrigin);
   res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
@@ -30,6 +32,14 @@ const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://lo
 const WAHA_API_KEY = process.env.WAHA_API_KEY || "123456";
 const SESSION = process.env.WAHA_SESSION || "default";
 const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "finalmessageassets";
+
+const supabase =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    : null;
 
 const pool = USAR_POSTGRES
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -50,7 +60,38 @@ const CONFIG_PADRAO = {
   mensagem_final: "",
   delay_mensagem_final_segundos: 20,
   pergunta_confirmacao_final: "Te ajudo em algo mais?",
+  final_message_image_url: "",
+  final_message_image_path: "",
+  final_message_image_mime: "",
+  final_message_image_size: 0,
 };
+
+const MIME_IMAGENS_MENSAGEM_FINAL = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const EXTENSAO_POR_MIME = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+const uploadImagemMensagemFinal = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!MIME_IMAGENS_MENSAGEM_FINAL.has(file.mimetype)) {
+      cb(new Error("Formato de imagem nao permitido"));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
 
 const PERGUNTA_VIDEO =
   "O vídeo resolveu sua dúvida? Se ainda precisar, posso encaminhar para um operador.";
@@ -544,8 +585,25 @@ async function enviarMensagem(numero, texto) {
   );
 }
 
+async function enviarImagem(numero, imageUrl) {
+  await axios.post(
+    `${WAHA_URL}/api/sendImage`,
+    {
+      session: SESSION,
+      chatId: numero,
+      file: {
+        url: imageUrl,
+      },
+    },
+    {
+      headers: { "X-Api-Key": WAHA_API_KEY },
+    }
+  );
+}
+
 function normalizarConfig(config) {
   const delayInformado = Number(config?.delay_mensagem_final_segundos);
+  const tamanhoImagem = Number(config?.final_message_image_size);
 
   return {
     ...CONFIG_PADRAO,
@@ -559,6 +617,10 @@ function normalizarConfig(config) {
       0,
       Number.isNaN(delayInformado) ? CONFIG_PADRAO.delay_mensagem_final_segundos : delayInformado
     ),
+    final_message_image_url: String(config?.final_message_image_url || ""),
+    final_message_image_path: String(config?.final_message_image_path || ""),
+    final_message_image_mime: String(config?.final_message_image_mime || ""),
+    final_message_image_size: Number.isNaN(tamanhoImagem) ? 0 : tamanhoImagem,
   };
 }
 
@@ -583,6 +645,16 @@ function salvarConfig(config) {
   }
 
   const novaConfig = normalizarConfig({ ...configAtual, ...configPermitida });
+  salvarJson(ARQUIVO_CONFIG, novaConfig);
+  return novaConfig;
+}
+
+function salvarConfigImagem(camposImagem) {
+  const novaConfig = normalizarConfig({
+    ...carregarConfig(),
+    ...camposImagem,
+  });
+
   salvarJson(ARQUIVO_CONFIG, novaConfig);
   return novaConfig;
 }
@@ -636,6 +708,15 @@ async function enviarMensagemFinal(numero) {
   if (!(await podeEnviarMensagemFinal(numero))) {
     escreverLog(`MENSAGEM FINAL JÁ ENVIADA HOJE | ${numero}`);
     return false;
+  }
+
+  if (config.final_message_image_url) {
+    try {
+      await enviarImagem(numero, config.final_message_image_url);
+      escreverLog(`IMAGEM MENSAGEM FINAL ENVIADA | ${numero}`);
+    } catch (error) {
+      escreverLog(`ERRO IMAGEM MENSAGEM FINAL | ${numero} | ${error.message}`);
+    }
   }
 
   await enviarMensagem(numero, config.mensagem_final);
@@ -721,6 +802,86 @@ app.get("/api/config", (req, res) => {
 app.post("/api/config", (req, res) => {
   const config = salvarConfig(req.body || {});
   res.json(config);
+});
+
+app.post(
+  "/api/config/final-message-image",
+  uploadImagemMensagemFinal.single("image"),
+  async (req, res) => {
+    try {
+      if (!supabase) {
+        return res.status(500).json({ erro: "Supabase nao configurado" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ erro: "Imagem nao enviada" });
+      }
+
+      const extensao = EXTENSAO_POR_MIME[req.file.mimetype];
+      const filePath = `final-message-${Date.now()}.${extensao}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .upload(filePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const configAtual = carregarConfig();
+
+      if (configAtual.final_message_image_path) {
+        await supabase.storage
+          .from(SUPABASE_BUCKET)
+          .remove([configAtual.final_message_image_path]);
+      }
+
+      const { data } = supabase.storage
+        .from(SUPABASE_BUCKET)
+        .getPublicUrl(filePath);
+
+      const config = salvarConfigImagem({
+        final_message_image_url: data.publicUrl,
+        final_message_image_path: filePath,
+        final_message_image_mime: req.file.mimetype,
+        final_message_image_size: req.file.size,
+      });
+
+      escreverLog(`IMAGEM MENSAGEM FINAL CONFIGURADA | ${filePath}`);
+      return res.json(config);
+    } catch (error) {
+      escreverLog(`ERRO UPLOAD IMAGEM MENSAGEM FINAL | ${error.message}`);
+      return res.status(500).json({ erro: "Nao foi possivel enviar a imagem" });
+    }
+  }
+);
+
+app.delete("/api/config/final-message-image", async (req, res) => {
+  try {
+    const configAtual = carregarConfig();
+
+    if (supabase && configAtual.final_message_image_path) {
+      await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .remove([configAtual.final_message_image_path]);
+    }
+
+    const config = salvarConfigImagem({
+      final_message_image_url: "",
+      final_message_image_path: "",
+      final_message_image_mime: "",
+      final_message_image_size: 0,
+    });
+
+    escreverLog("IMAGEM MENSAGEM FINAL REMOVIDA");
+    return res.json(config);
+  } catch (error) {
+    escreverLog(`ERRO REMOVER IMAGEM MENSAGEM FINAL | ${error.message}`);
+    return res.status(500).json({ erro: "Nao foi possivel remover a imagem" });
+  }
 });
 
 app.post("/api/fila/encerrar", async (req, res) => {

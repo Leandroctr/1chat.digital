@@ -141,6 +141,31 @@
               <textarea id="mensagemFinal" rows="5" placeholder="Digite a mensagem final"></textarea>
             </label>
 
+            <div class="image-config">
+              <div class="image-config-header">
+                <div>
+                  <strong>Imagem da mensagem final</strong>
+                  <span>Recomendado: 1080x1920</span>
+                </div>
+              </div>
+
+              <div class="image-preview-box">
+                <img id="mensagemFinalImagePreview" class="image-preview" alt="Preview da imagem final" hidden />
+                <span id="mensagemFinalImageEmpty" class="image-empty">Nenhuma imagem configurada</span>
+              </div>
+
+              <label>
+                <span>Enviar imagem</span>
+                <input id="mensagemFinalImage" type="file" accept="image/jpeg,image/png,image/webp" />
+              </label>
+
+              <div class="config-actions">
+                <button class="secondary" type="button" onclick="enviarImagemMensagemFinal()">Enviar imagem</button>
+                <button class="danger" type="button" onclick="removerImagemMensagemFinal()">Remover imagem</button>
+                <span id="imageStatus" class="status-message"></span>
+              </div>
+            </div>
+
             <div class="config-actions">
               <button class="primary" type="submit">Salvar configuração</button>
               <span id="configStatus" class="status-message"></span>
