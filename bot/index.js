@@ -39,11 +39,12 @@ app.use((req, res, next) => {
 
   return next();
 });
+app.use(express.static(path.join(__dirname, "public")));
 
 app.use((err, req, res, next) => {
   if (err.status === 413 || err.type === "entity.too.large") {
-    console.log(`WEBHOOK GRANDE IGNORADO | ${req.originalUrl}`);
-return res.sendStatus(200);
+ console.log(`WEBHOOK GRANDE IGNORADO | ${req.originalUrl}`);
+    return res.sendStatus(200);
   }
 
   return next(err);
