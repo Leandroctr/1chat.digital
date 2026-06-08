@@ -12,7 +12,21 @@ const { perguntarIA } = require("./ia");
 
 const app = express();
 
-app.use(express.json({ limit: "25mb" }));
+app.use(
+  "/webhook",
+  express.json({
+    limit: "1mb",
+    verify: (req, res, buf) => {
+      if (buf.length > 1024 * 1024) {
+        const erro = new Error("Webhook ignorado: payload grande demais");
+        erro.status = 413;
+        throw erro;
+      }
+    },
+  })
+);
+
+app.use(express.json({ limit: "5mb" }));
 app.use((req, res, next) => {
   const allowedOrigin = process.env.CORS_ORIGIN || "*";
   res.header("Access-Control-Allow-Origin", allowedOrigin);
@@ -26,7 +40,14 @@ app.use((req, res, next) => {
   return next();
 });
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use((err, req, res, next) => {
+  if (err.status === 413 || err.type === "entity.too.large") {
+    console.log(`WEBHOOK GRANDE IGNORADO | ${req.originalUrl}`);
+return res.sendStatus(200);
+  }
+
+  return next(err);
+});
 
 const PORT = process.env.PORT || 3000;
 const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://localhost:3001";
