@@ -186,6 +186,11 @@ function mapearItemFila(row) {
 }
 
 function carregarRespostas() {
+  if (!fs.existsSync(ARQUIVO_RESPOSTAS)) {
+    escreverLog("ARQUIVO RESPOSTAS NAO ENCONTRADO");
+    return [];
+  }
+
   const workbook = XLSX.readFile(ARQUIVO_RESPOSTAS);
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json(sheet);
@@ -239,12 +244,7 @@ function buscarResposta(mensagemCliente) {
     }
   }
 
-  if (melhorResposta) return melhorResposta;
-
-  return {
-    texto: "Olá! Recebi sua mensagem. Em breve vou te responder por aqui.",
-    linkVideo: null,
-  };
+  return melhorResposta;
 }
 
 async function carregarAtendimentos() {
@@ -856,24 +856,39 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    let respostaEncontrada = buscarResposta(mensagemTexto);
-    let resposta = respostaEncontrada.texto;
-    let linkVideo = respostaEncontrada.linkVideo;
+    escreverLog(`BUSCANDO RESPOSTA PLANILHA | ${numero} | ${mensagemTexto}`);
+    const respostaEncontrada = buscarResposta(mensagemTexto);
 
-    if (!resposta || resposta.includes("Recebi sua mensagem")) {
-      resposta = await perguntarIA(mensagemTexto);
-      linkVideo = null;
+    if (respostaEncontrada?.texto) {
+      escreverLog(`RESPOSTA PLANILHA ENCONTRADA | ${numero}`);
+      await enviarMensagem(numero, respostaEncontrada.texto);
+
+      if (respostaEncontrada.linkVideo) {
+        escreverLog(`LINK VIDEO ENCONTRADO | ${numero} | ${respostaEncontrada.linkVideo}`);
+        await enviarMensagem(numero, respostaEncontrada.linkVideo);
+      }
+
+      return res.sendStatus(200);
     }
 
-    escreverLog(`RESPOSTA | ${numero} | ${resposta}`);
-    console.log("RESPOSTA ENVIADA");
-    console.log(resposta);
+    escreverLog(`CHAMANDO IA | ${numero}`);
 
-    await enviarMensagem(numero, resposta);
+    try {
+      const respostaIA = await perguntarIA(mensagemTexto);
 
-    if (linkVideo) {
-      await enviarMensagem(numero, linkVideo);
+      if (respostaIA) {
+        escreverLog(`RESPOSTA | ${numero} | ${respostaIA}`);
+        await enviarMensagem(numero, respostaIA);
+        return res.sendStatus(200);
+      }
+    } catch (errorIA) {
+      escreverLog(`ERRO IA | ${numero} | ${errorIA.message}`);
     }
+
+    await enviarMensagem(
+      numero,
+      "Não encontrei essa informação agora. Vou encaminhar para atendimento humano."
+    );
 
     return res.sendStatus(200);
   } catch (error) {
