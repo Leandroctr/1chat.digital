@@ -99,7 +99,7 @@ const uploadImagemMensagemFinal = multer({
 });
 
 const PERGUNTA_VIDEO =
-  "O vídeo resolveu sua dúvida? Se ainda precisar, posso encaminhar para um operador.";
+  "O video resolveu sua duvida? Se ainda precisar, posso encaminhar para uma operadora.";
 
 function garantirPasta(caminho) {
   if (!fs.existsSync(caminho)) {
@@ -773,6 +773,7 @@ async function iniciarFluxoEncerramento(numero) {
   }, config.delay_mensagem_final_segundos * 1000);
 
   timersMensagemFinal.set(numero, timer);
+  escreverLog(`TIMER FINAL INICIADO | ${numero}`);
 }
 
 async function iniciarFluxoPosResposta(numero) {
@@ -822,10 +823,11 @@ async function iniciarFluxoPosResposta(numero) {
   }, config.delay_mensagem_final_segundos * 1000);
 
   timersMensagemFinal.set(numero, timer);
+  escreverLog(`TIMER FINAL INICIADO | ${numero}`);
 }
 
 function usuarioConfirmouEncerramento(mensagemNormalizada) {
-  const respostasExatas = ["nao", "n", "ok", "valeu", "tudo certo"];
+  const respostasExatas = ["nao", "n", "ok", "valeu", "tudo certo", "sim", "sim obrigado"];
 
   if (respostasExatas.includes(mensagemNormalizada)) {
     return true;
@@ -833,6 +835,35 @@ function usuarioConfirmouEncerramento(mensagemNormalizada) {
 
   const respostasPorTrecho = ["obrigado", "obrigada"];
   return respostasPorTrecho.some((resposta) => mensagemNormalizada.includes(resposta));
+}
+
+function usuarioConfirmouVideo(mensagemNormalizada) {
+  const respostasExatas = [
+    "sim",
+    "sim resolveu",
+    "resolveu",
+    "ok",
+    "obrigado",
+    "obrigada",
+    "valeu",
+    "tudo certo",
+  ];
+
+  if (respostasExatas.includes(mensagemNormalizada)) {
+    return true;
+  }
+
+  return mensagemNormalizada.includes("obrigado") || mensagemNormalizada.includes("obrigada");
+}
+
+function usuarioNegouVideo(mensagemNormalizada) {
+  const respostasNegativas = ["nao", "nao resolveu"];
+
+  if (respostasNegativas.includes(mensagemNormalizada)) {
+    return true;
+  }
+
+  return pediuOperador(mensagemNormalizada);
 }
 
 function pediuOperador(mensagemNormalizada) {
@@ -1006,6 +1037,7 @@ app.post("/webhook", async (req, res) => {
       cancelarTimerMensagemFinal(numero);
 
       if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
+        escreverLog(`CONFIRMACAO FINAL | ${numero}`);
         await enviarMensagemFinal(numero);
         await limparAtendimento(numero);
         escreverLog(`ENCERRAMENTO CONFIRMADO | ${numero}`);
@@ -1018,10 +1050,34 @@ app.post("/webhook", async (req, res) => {
       escreverLog(`ENCERRAMENTO CANCELADO | ${numero} | ${mensagemTexto}`);
     }
 
+    if (atendimento.etapa === "aguardando_confirmacao_video") {
+      if (usuarioConfirmouVideo(mensagemNormalizada)) {
+        escreverLog(`CONFIRMACAO VIDEO POSITIVA | ${numero} | ${mensagemTexto}`);
+        await atualizarAtendimento(numero, {
+          modo: "bot",
+          etapa: "aguardando_confirmacao_final",
+        });
+        await iniciarFluxoEncerramento(numero);
+        return res.sendStatus(200);
+      }
+
+      if (usuarioNegouVideo(mensagemNormalizada)) {
+        escreverLog(`CONFIRMACAO VIDEO NEGATIVA | ${numero} | ${mensagemTexto}`);
+        await encaminharParaHumano(numero, mensagemTexto);
+        return res.sendStatus(200);
+      }
+
+      await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
+      atendimento.modo = "bot";
+      atendimento.etapa = "liberado";
+      escreverLog(`CONFIRMACAO VIDEO CONTINUOU ATENDIMENTO | ${numero} | ${mensagemTexto}`);
+    }
+
     if (atendimento.etapa === "aguardando_confirmacao_pos_resposta") {
       cancelarTimerMensagemFinal(numero);
 
       if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
+        escreverLog(`CONFIRMACAO FINAL | ${numero}`);
         await enviarMensagemFinal(numero);
         await limparAtendimento(numero);
         escreverLog(`POS RESPOSTA ENCERRADO PELO USUARIO | ${numero}`);
@@ -1125,6 +1181,11 @@ app.post("/webhook", async (req, res) => {
         escreverLog(`LINK VIDEO ENCONTRADO | ${numero} | ${respostaEncontrada.linkVideo}`);
         await enviarMensagem(numero, respostaEncontrada.linkVideo);
         await enviarMensagem(numero, PERGUNTA_VIDEO);
+        await atualizarAtendimento(numero, {
+          modo: "bot",
+          etapa: "aguardando_confirmacao_video",
+        });
+        return res.sendStatus(200);
       }
 
       await iniciarFluxoPosResposta(numero);
