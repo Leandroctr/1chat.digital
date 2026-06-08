@@ -41,7 +41,7 @@ async function carregarConfig() {
     mostrarStatusConfig("");
   } catch (error) {
     mostrarStatusConfig(
-      "Nao foi possivel carregar a configuracao.",
+      "Não foi possível carregar a configuração.",
       "error"
     );
   }
@@ -71,7 +71,7 @@ async function salvarConfig(event) {
     });
 
     if (!response.ok) {
-      throw new Error("Erro ao salvar configuracao");
+      throw new Error("Erro ao salvar configuração");
     }
 
     const configSalva = await response.json();
@@ -85,10 +85,10 @@ async function salvarConfig(event) {
     document.getElementById("delayMensagemFinal").value =
       configSalva.delay_mensagem_final_segundos ?? 20;
 
-    mostrarStatusConfig("Configuracao salva.", "success");
+    mostrarStatusConfig("Configuração salva.", "success");
   } catch (error) {
     mostrarStatusConfig(
-      "Nao foi possivel salvar a configuracao.",
+      "Não foi possível salvar a configuração.",
       "error"
     );
   }

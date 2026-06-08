@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const axios = require("axios");
 const XLSX = require("xlsx");
 const path = require("path");
@@ -649,7 +649,7 @@ async function enviarMensagemFinal(numero) {
   }
 
   if (!(await podeEnviarMensagemFinal(numero))) {
-    escreverLog(`MENSAGEM FINAL JA ENVIADA HOJE | ${numero}`);
+    escreverLog(`MENSAGEM FINAL JÁ ENVIADA HOJE | ${numero}`);
     return false;
   }
 
@@ -680,9 +680,9 @@ async function iniciarFluxoEncerramento(numero) {
     try {
       await enviarMensagemFinal(numero);
       await limparAtendimento(numero);
-      escreverLog(`ENCERRAMENTO AUTOMATICO | ${numero}`);
+      escreverLog(`ENCERRAMENTO AUTOMÁTICO | ${numero}`);
     } catch (error) {
-      escreverLog(`ERRO MENSAGEM FINAL AUTOMATICA | ${numero} | ${error.message}`);
+      escreverLog(`ERRO MENSAGEM FINAL AUTOMÁTICA | ${numero} | ${error.message}`);
     }
   }, config.delay_mensagem_final_segundos * 1000);
 
