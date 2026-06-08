@@ -28,7 +28,10 @@ body {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
   width: 280px;
+  height: 100vh;
   background: var(--sidebar);
   color: white;
   padding: 28px;
@@ -65,21 +68,27 @@ body {
   font-size: 13px;
 }
 
-nav {
+.menu {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-nav a {
+.menu-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
   padding: 14px 16px;
   border-radius: 14px;
-  color: #cbd5e1;
-  cursor: default;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
 }
 
-nav a.active,
-nav a:hover {
+.menu-item.active,
+.menu-item:hover {
   background: rgba(255, 255, 255, 0.1);
   color: white;
 }
@@ -99,13 +108,23 @@ nav a:hover {
 
 .content {
   flex: 1;
+  min-width: 0;
   padding: 34px;
+}
+
+.page-section {
+  display: none;
+}
+
+.page-section.active {
+  display: block;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 18px;
   margin-bottom: 28px;
 }
 
@@ -182,7 +201,7 @@ nav a:hover {
 }
 
 .config-panel {
-  margin-bottom: 24px;
+  max-width: 860px;
 }
 
 .panel-header {
@@ -228,7 +247,7 @@ nav a:hover {
 }
 
 .config-form textarea {
-  min-height: 110px;
+  min-height: 140px;
   resize: vertical;
 }
 
@@ -359,5 +378,57 @@ td {
 
   .sidebar {
     width: 230px;
+  }
+}
+
+@media (max-width: 760px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    padding: 20px;
+  }
+
+  .brand {
+    margin-bottom: 18px;
+  }
+
+  .menu {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .menu-item {
+    white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .content {
+    padding: 22px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar h2 {
+    font-size: 28px;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  th,
+  td {
+    padding: 14px 16px;
   }
 }
