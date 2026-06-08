@@ -944,6 +944,8 @@ app.post(
 
       const extensao = EXTENSAO_POR_MIME[req.file.mimetype];
       const filePath = `final-message-${Date.now()}.${extensao}`;
+      const configAtual = carregarConfig();
+      const imagemAntigaPath = configAtual.final_message_image_path;
 
       const { error: uploadError } = await supabase.storage
         .from(SUPABASE_BUCKET)
@@ -956,12 +958,20 @@ app.post(
         throw uploadError;
       }
 
-      const configAtual = carregarConfig();
+      if (imagemAntigaPath) {
+        try {
+          const { error: removeError } = await supabase.storage
+            .from(SUPABASE_BUCKET)
+            .remove([imagemAntigaPath]);
 
-      if (configAtual.final_message_image_path) {
-        await supabase.storage
-          .from(SUPABASE_BUCKET)
-          .remove([configAtual.final_message_image_path]);
+          if (removeError) {
+            throw removeError;
+          }
+
+          escreverLog(`IMAGEM ANTIGA REMOVIDA | ${imagemAntigaPath}`);
+        } catch (error) {
+          escreverLog(`ERRO REMOVER IMAGEM ANTIGA | ${imagemAntigaPath} | ${error.message}`);
+        }
       }
 
       const { data } = supabase.storage
