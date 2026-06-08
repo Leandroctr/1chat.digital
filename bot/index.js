@@ -12,7 +12,7 @@ const { perguntarIA } = require("./ia");
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use((req, res, next) => {
   const allowedOrigin = process.env.CORS_ORIGIN || "*";
   res.header("Access-Control-Allow-Origin", allowedOrigin);
