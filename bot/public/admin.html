@@ -17,12 +17,13 @@
         </div>
       </div>
 
-      <nav>
-        <a class="active">Fila</a>
-        <a>Atendimentos</a>
-        <a>Perguntas</a>
-        <a>Relatórios</a>
-        <a>Logs</a>
+      <nav class="menu">
+        <button class="menu-item active" type="button" data-section="atendimentos" onclick="mostrarSecao('atendimentos')">
+          Atendimentos
+        </button>
+        <button class="menu-item" type="button" data-section="mensagemFinal" onclick="mostrarSecao('mensagemFinal')">
+          Mensagem Final
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -32,108 +33,120 @@
     </aside>
 
     <main class="content">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Operação de suporte</p>
-          <h2>Fila de atendimento humano</h2>
-          <span>Gerencie clientes que solicitaram operador.</span>
-        </div>
+      <section id="sectionAtendimentos" class="page-section active">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Operação de suporte</p>
+            <h2>Fila de atendimento humano</h2>
+            <span>Gerencie clientes que solicitaram operador.</span>
+          </div>
 
-        <button class="primary" onclick="carregarFila()">Atualizar fila</button>
-      </header>
+          <button class="primary" onclick="carregarFila()">Atualizar fila</button>
+        </header>
 
-      <section class="metrics">
-        <div class="metric-card">
-          <span>Na fila</span>
-          <strong id="totalFila">0</strong>
-          <small>Aguardando operador</small>
-        </div>
+        <section class="metrics">
+          <div class="metric-card">
+            <span>Na fila</span>
+            <strong id="totalFila">0</strong>
+            <small>Aguardando operador</small>
+          </div>
 
-        <div class="metric-card">
-          <span>Status bot</span>
-          <strong class="green">Online</strong>
-          <small>WAHA + Node local</small>
-        </div>
+          <div class="metric-card">
+            <span>Status bot</span>
+            <strong class="green">Online</strong>
+            <small>WAHA + Node local</small>
+          </div>
 
-        <div class="metric-card">
-          <span>Modo humano</span>
-          <strong id="totalHumano">0</strong>
-          <small>Automação pausada</small>
-        </div>
+          <div class="metric-card">
+            <span>Modo humano</span>
+            <strong id="totalHumano">0</strong>
+            <small>Automação pausada</small>
+          </div>
 
-        <div class="metric-card">
-          <span>Atualização</span>
-          <strong id="ultimaAtualizacao">--:--</strong>
-          <small>Atualiza a cada 10s</small>
-        </div>
+          <div class="metric-card">
+            <span>Atualização</span>
+            <strong id="ultimaAtualizacao">--:--</strong>
+            <small>Atualiza a cada 10s</small>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Atendimentos aguardando</h3>
+              <p>O operador responde pelo WhatsApp. Aqui ele apenas encerra o atendimento.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>CPF</th>
+                  <th>Site</th>
+                  <th>Última mensagem</th>
+                  <th>Horário</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="filaBody">
+                <tr>
+                  <td colspan="7" class="empty">Carregando fila...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
-      <section class="panel config-panel">
-        <div class="panel-header">
+      <section id="sectionMensagemFinal" class="page-section">
+        <header class="topbar">
           <div>
-            <h3>Mensagem final</h3>
-            <p>Configure a mensagem enviada somente ao encerrar o atendimento humano.</p>
+            <p class="eyebrow">Configuração</p>
+            <h2>Mensagem final</h2>
+            <span>Configure a mensagem enviada somente ao encerrar o atendimento humano.</span>
           </div>
-        </div>
+        </header>
 
-        <form class="config-form" onsubmit="salvarConfig(event)">
-          <label class="checkbox-row">
-            <input type="checkbox" id="mensagemFinalAtiva" />
-            <span>Ativar mensagem final</span>
-          </label>
+        <section class="panel config-panel">
+          <div class="panel-header">
+            <div>
+              <h3>Mensagem final</h3>
+              <p>Defina a confirmação, o delay e o texto final do encerramento.</p>
+            </div>
+          </div>
 
-          <label>
-            <span>Mensagem final</span>
-            <textarea id="mensagemFinal" rows="4" placeholder="Digite a mensagem final"></textarea>
-          </label>
-
-          <div class="config-grid">
-            <label>
-              <span>Pergunta de confirmação</span>
-              <input id="perguntaConfirmacaoFinal" type="text" placeholder="Te ajudo em algo mais?" />
+          <form class="config-form" onsubmit="salvarConfig(event)">
+            <label class="checkbox-row">
+              <input type="checkbox" id="mensagemFinalAtiva" />
+              <span>Ativar mensagem final</span>
             </label>
 
+            <div class="config-grid">
+              <label>
+                <span>Pergunta de confirmação</span>
+                <input id="perguntaConfirmacaoFinal" type="text" placeholder="Te ajudo em algo mais?" />
+              </label>
+
+              <label>
+                <span>Delay em segundos</span>
+                <input id="delayMensagemFinal" type="number" min="0" step="1" />
+              </label>
+            </div>
+
             <label>
-              <span>Delay em segundos</span>
-              <input id="delayMensagemFinal" type="number" min="0" step="1" />
+              <span>Mensagem final</span>
+              <textarea id="mensagemFinal" rows="5" placeholder="Digite a mensagem final"></textarea>
             </label>
-          </div>
 
-          <div class="config-actions">
-            <button class="primary" type="submit">Salvar configuração</button>
-            <span id="configStatus" class="status-message"></span>
-          </div>
-        </form>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>Atendimentos aguardando</h3>
-            <p>O operador responde pelo WhatsApp. Aqui ele apenas encerra o atendimento.</p>
-          </div>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>CPF</th>
-                <th>Site</th>
-                <th>Última mensagem</th>
-                <th>Horário</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="filaBody">
-              <tr>
-                <td colspan="7" class="empty">Carregando fila...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            <div class="config-actions">
+              <button class="primary" type="submit">Salvar configuração</button>
+              <span id="configStatus" class="status-message"></span>
+            </div>
+          </form>
+        </section>
       </section>
     </main>
   </div>
