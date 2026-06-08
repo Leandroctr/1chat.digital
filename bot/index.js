@@ -43,7 +43,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use((err, req, res, next) => {
   if (err.status === 413 || err.type === "entity.too.large") {
- console.log(`WEBHOOK GRANDE IGNORADO | ${req.originalUrl}`);
+    logWarn("WEBHOOK", "Webhook grande ignorado", { url: req.originalUrl });
     return res.sendStatus(200);
   }
 
@@ -78,6 +78,8 @@ const timersMensagemFinal = new Map();
 const ARQUIVO_RESPOSTAS = path.join(__dirname, "data", "respostas.xlsx");
 const ARQUIVO_CONFIG = path.join(__dirname, "data", "config.json");
 const PASTA_LOGS = path.join(__dirname, "logs");
+const ARQUIVO_APP_LOG = path.join(PASTA_LOGS, "app.log");
+const ARQUIVO_ERROR_LOG = path.join(PASTA_LOGS, "error.log");
 const ARQUIVO_ATENDIMENTOS = path.join(__dirname, "data", "atendimentos.json");
 const ARQUIVO_FILA = path.join(__dirname, "data", "fila.json");
 const ARQUIVO_FINAL_MESSAGE_LOG = path.join(__dirname, "data", "final-message-log.json");
@@ -160,6 +162,21 @@ function horarioAtual() {
   return new Date().toLocaleString("pt-BR");
 }
 
+function timestampLog() {
+  const data = new Date();
+  const pad = (valor) => String(valor).padStart(2, "0");
+
+  return [
+    data.getFullYear(),
+    pad(data.getMonth() + 1),
+    pad(data.getDate()),
+  ].join("-") + " " + [
+    pad(data.getHours()),
+    pad(data.getMinutes()),
+    pad(data.getSeconds()),
+  ].join(":");
+}
+
 function dataBanco(valor) {
   if (!valor) return null;
   if (valor instanceof Date) return valor;
@@ -168,10 +185,139 @@ function dataBanco(valor) {
   return Number.isNaN(data.getTime()) ? null : data;
 }
 
-function escreverLog(texto) {
+function sanitizarValorLog(valor) {
+  if (valor === null || valor === undefined) return "";
+  if (valor instanceof Error) return valor.message;
+
+  const texto = typeof valor === "string" ? valor : JSON.stringify(valor);
+
+  return String(texto)
+    .replace(/SUPABASE_SERVICE_ROLE_KEY=[^\s|]+/gi, "SUPABASE_SERVICE_ROLE_KEY=[redacted]")
+    .replace(/WAHA_API_KEY=[^\s|]+/gi, "WAHA_API_KEY=[redacted]")
+    .replace(/DATABASE_URL=[^\s|]+/gi, "DATABASE_URL=[redacted]")
+    .replace(/token=[^\s|]+/gi, "token=[redacted]")
+    .slice(0, 500);
+}
+
+function formatarDadosLog(dados) {
+  if (!dados || typeof dados !== "object") return "";
+
+  return Object.entries(dados)
+    .filter(([chave, valor]) => valor !== undefined && valor !== null && !/key|token|secret|password|database_url/i.test(chave))
+    .map(([chave, valor]) => `${chave}=${sanitizarValorLog(valor)}`)
+    .join(" | ");
+}
+
+function escreverLinhaLog(arquivo, linha) {
   garantirPasta(PASTA_LOGS);
-  const arquivoLog = path.join(PASTA_LOGS, `${dataAtual()}.log`);
-  fs.appendFileSync(arquivoLog, `[${horarioAtual()}] ${texto}\n`, "utf8");
+  fs.appendFileSync(arquivo, `${linha}\n`, "utf8");
+}
+
+function escreverLog(texto) {
+  escreverLinhaLog(ARQUIVO_APP_LOG, `[${timestampLog()}] [INFO] [LOG] ${sanitizarValorLog(texto)}`);
+}
+
+function logInfo(categoria, mensagem, dadosOpcional) {
+  const dados = formatarDadosLog(dadosOpcional);
+  escreverLinhaLog(
+    ARQUIVO_APP_LOG,
+    `[${timestampLog()}] [INFO] [${categoria}] ${mensagem}${dados ? ` | ${dados}` : ""}`
+  );
+}
+
+function logWarn(categoria, mensagem, dadosOpcional) {
+  const dados = formatarDadosLog(dadosOpcional);
+  escreverLinhaLog(
+    ARQUIVO_APP_LOG,
+    `[${timestampLog()}] [WARN] [${categoria}] ${mensagem}${dados ? ` | ${dados}` : ""}`
+  );
+}
+
+function resumirErro(erroOuDadosOpcional) {
+  if (erroOuDadosOpcional instanceof Error) {
+    const resumo = {
+      erro: erroOuDadosOpcional.message,
+    };
+
+    if (erroOuDadosOpcional.response?.status) {
+      resumo.status = erroOuDadosOpcional.response.status;
+    }
+
+    if (erroOuDadosOpcional.response?.data) {
+      resumo.response = sanitizarValorLog(erroOuDadosOpcional.response.data);
+    }
+
+    return resumo;
+  }
+
+  return erroOuDadosOpcional;
+}
+
+function logError(categoria, mensagem, erroOuDadosOpcional) {
+  const dados = formatarDadosLog(resumirErro(erroOuDadosOpcional));
+  const linha = `[${timestampLog()}] [ERROR] [${categoria}] ${mensagem}${dados ? ` | ${dados}` : ""}`;
+
+  escreverLinhaLog(ARQUIVO_APP_LOG, linha);
+  escreverLinhaLog(ARQUIVO_ERROR_LOG, linha);
+}
+
+function logState(numero, etapaAnterior, etapaNova, motivo) {
+  escreverLinhaLog(
+    ARQUIVO_APP_LOG,
+    `[${timestampLog()}] [STATE] numero=${sanitizarValorLog(numero)} | ${sanitizarValorLog(etapaAnterior || "-")} -> ${sanitizarValorLog(etapaNova || "-")} | motivo=${sanitizarValorLog(motivo || "atualizar_atendimento")}`
+  );
+}
+
+function rotacionarArquivoLog(nomeBase) {
+  const arquivoAtual = path.join(PASTA_LOGS, `${nomeBase}.log`);
+
+  if (!fs.existsSync(arquivoAtual)) {
+    fs.writeFileSync(arquivoAtual, "", "utf8");
+    return;
+  }
+
+  const stats = fs.statSync(arquivoAtual);
+  const dataArquivo = stats.mtime.toISOString().split("T")[0];
+  const hoje = dataAtual();
+
+  if (dataArquivo !== hoje) {
+    const destino = path.join(PASTA_LOGS, `${nomeBase}-${dataArquivo}.log`);
+
+    if (fs.existsSync(destino)) {
+      fs.unlinkSync(destino);
+    }
+
+    fs.renameSync(arquivoAtual, destino);
+    fs.writeFileSync(arquivoAtual, "", "utf8");
+  }
+}
+
+function limparLogsAntigos() {
+  const hoje = dataAtual();
+  const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const manter = new Set(["app.log", "error.log", `app-${hoje}.log`, `error-${hoje}.log`, `app-${ontem}.log`, `error-${ontem}.log`]);
+
+  for (const arquivo of fs.readdirSync(PASTA_LOGS)) {
+    if (/^(app|error)-\d{4}-\d{2}-\d{2}\.log$/.test(arquivo) && !manter.has(arquivo)) {
+      fs.unlinkSync(path.join(PASTA_LOGS, arquivo));
+    }
+  }
+}
+
+function rotacionarLogsNoStartup() {
+  try {
+    garantirPasta(PASTA_LOGS);
+    rotacionarArquivoLog("app");
+    rotacionarArquivoLog("error");
+    limparLogsAntigos();
+    logInfo("LOG", "Rotacao de logs executada");
+  } catch (error) {
+    try {
+      logWarn("LOG", "Falha ao limpar logs antigos", { erro: error.message });
+    } catch {
+      console.error("Falha ao rotacionar logs", error.message);
+    }
+  }
 }
 
 function carregarJson(caminho, padrao) {
@@ -258,7 +404,7 @@ function mapearItemFila(row) {
 
 function carregarRespostas() {
   if (!fs.existsSync(ARQUIVO_RESPOSTAS)) {
-    escreverLog("ARQUIVO RESPOSTAS NAO ENCONTRADO");
+    logWarn("CONFIG", "ARQUIVO RESPOSTAS NAO ENCONTRADO");
     return [];
   }
 
@@ -440,10 +586,18 @@ async function atualizarAtendimento(numero, novosDados) {
       ]
     );
 
-    return mapearAtendimento(rows[0]);
+    const atualizado = mapearAtendimento(rows[0]);
+
+    if (novosDados.etapa && atual.etapa !== atualizado.etapa) {
+      logState(numero, atual.etapa, atualizado.etapa, "atualizar_atendimento");
+    }
+
+    return atualizado;
   }
 
   const atendimentos = await carregarAtendimentos();
+  const etapaAnterior = atendimentos[numero]?.etapa;
+
   atendimentos[numero] = {
     ...(atendimentos[numero] || {}),
     ...novosDados,
@@ -451,6 +605,11 @@ async function atualizarAtendimento(numero, novosDados) {
   };
 
   await salvarAtendimentos(atendimentos);
+
+  if (novosDados.etapa && etapaAnterior !== atendimentos[numero].etapa) {
+    logState(numero, etapaAnterior, atendimentos[numero].etapa, "atualizar_atendimento");
+  }
+
   return atendimentos[numero];
 }
 
@@ -470,6 +629,9 @@ async function ativarModoHumano(numero) {
     etapa: "humano",
     iniciadoEm: USAR_POSTGRES ? new Date() : horarioAtual(),
   });
+
+  logState(numero, "qualquer", "humano", "modo_humano");
+  logInfo("HUMANO", "Modo humano ativado", { numero });
 }
 
 async function limparAtendimento(numero) {
@@ -568,6 +730,7 @@ async function adicionarNaFila(numero, mensagem) {
       ]
     );
 
+    logInfo("FILA", "Cliente adicionado na fila", { numero });
     return;
   }
 
@@ -586,49 +749,66 @@ async function adicionarNaFila(numero, mensagem) {
   });
 
   await salvarFila(fila);
+  logInfo("FILA", "Cliente adicionado na fila", { numero });
 }
 
 async function removerDaFila(numero) {
   if (USAR_POSTGRES) {
     await pool.query("DELETE FROM fila WHERE numero = $1", [numero]);
+    logInfo("FILA", "Cliente removido da fila", { numero });
     return;
   }
 
   const fila = await carregarFila();
   await salvarFila(fila.filter((item) => item.numero !== numero));
+  logInfo("FILA", "Cliente removido da fila", { numero });
 }
 
 async function enviarMensagem(numero, texto) {
-  await axios.post(
-    `${WAHA_URL}/api/sendText`,
-    {
-      session: SESSION,
-      chatId: numero,
-      text: texto,
-    },
-    {
-      headers: { "X-Api-Key": WAHA_API_KEY },
-    }
-  );
+  try {
+    await axios.post(
+      `${WAHA_URL}/api/sendText`,
+      {
+        session: SESSION,
+        chatId: numero,
+        text: texto,
+      },
+      {
+        headers: { "X-Api-Key": WAHA_API_KEY },
+      }
+    );
+
+    logInfo("WAHA", "Texto enviado", { numero, tamanho: String(texto || "").length });
+  } catch (error) {
+    logError("WAHA", "Falha ao enviar texto", { numero, ...resumirErro(error) });
+    throw error;
+  }
 }
 
 async function enviarImagem(numero, imageUrl) {
-  await axios.post(
-    `${WAHA_URL}/api/sendImage`,
-    {
-      session: SESSION,
-      chatId: numero,
-      file: {
-        url: imageUrl,
+  try {
+    await axios.post(
+      `${WAHA_URL}/api/sendImage`,
+      {
+        session: SESSION,
+        chatId: numero,
+        file: {
+          url: imageUrl,
+        },
+        caption: "",
       },
-      caption: "",
-    },
-    {
-      headers: {
-        "X-Api-Key": WAHA_API_KEY,
+      {
+        headers: {
+          "X-Api-Key": WAHA_API_KEY,
+        },
       },
-    }
-  );
+    );
+
+    logInfo("WAHA", "Imagem enviada", { numero });
+  } catch (error) {
+    logError("WAHA", "Falha ao enviar imagem", { numero, ...resumirErro(error) });
+    throw error;
+  }
 }
 
 function normalizarConfig(config) {
@@ -734,12 +914,12 @@ async function enviarMensagemFinal(numero) {
     !config.mensagem_final_ativa ||
     (!config.final_message_image_url && !config.mensagem_final.trim())
   ) {
-    escreverLog(`MENSAGEM FINAL DESATIVADA | ${numero}`);
+    logInfo("FINAL", "FINAL DESATIVADA", { numero });
     return false;
   }
 
   if (!(await podeEnviarMensagemFinal(numero))) {
-    escreverLog(`MENSAGEM FINAL JÁ ENVIADA HOJE | ${numero}`);
+    logInfo("FINAL", "FINAL JA ENVIADA HOJE", { numero });
     return false;
   }
 
@@ -747,26 +927,28 @@ async function enviarMensagemFinal(numero) {
 
   if (config.final_message_image_url) {
     try {
+      logInfo("FINAL", "FINAL ENVIANDO IMAGEM", { numero });
       await enviarImagem(numero, config.final_message_image_url);
       enviouAlgo = true;
-      escreverLog(`IMAGEM MENSAGEM FINAL ENVIADA | ${numero}`);
+      logInfo("FINAL", "FINAL IMAGEM ENVIADA", { numero });
     } catch (error) {
-      escreverLog(`ERRO IMAGEM MENSAGEM FINAL | ${numero} | ${error.message}`);
+      logError("FINAL", "Falha ao enviar imagem final", { numero, ...resumirErro(error) });
     }
   }
 
   if (config.mensagem_final.trim()) {
     await enviarMensagem(numero, config.mensagem_final);
     enviouAlgo = true;
+    logInfo("FINAL", "FINAL TEXTO ENVIADO", { numero });
   }
 
   if (!enviouAlgo) {
-    escreverLog(`MENSAGEM FINAL NAO ENVIADA | ${numero}`);
+    logWarn("FINAL", "FINAL NAO ENVIADA", { numero });
     return false;
   }
 
   await registrarMensagemFinalEnviada(numero);
-  escreverLog(`MENSAGEM FINAL ENVIADA | ${numero}`);
+  logInfo("FINAL", "FINAL CONCLUIDA", { numero });
   return true;
 }
 
@@ -791,31 +973,31 @@ async function iniciarFluxoEncerramento(numero) {
     try {
       await enviarMensagemFinal(numero);
       await limparAtendimento(numero);
-      escreverLog(`ENCERRAMENTO AUTOMÁTICO | ${numero}`);
+      logInfo("FINAL", "Encerramento automatico concluido", { numero });
     } catch (error) {
-      escreverLog(`ERRO MENSAGEM FINAL AUTOMÁTICA | ${numero} | ${error.message}`);
+      logError("FINAL", "Erro mensagem final automatica", { numero, ...resumirErro(error) });
     }
   }, config.delay_mensagem_final_segundos * 1000);
 
   timersMensagemFinal.set(numero, timer);
-  escreverLog(`TIMER FINAL INICIADO | ${numero}`);
+  logInfo("FINAL", "FINAL TIMER INICIADO", { numero });
 }
 
 async function iniciarFluxoPosResposta(numero) {
   if (timersMensagemFinal.has(numero)) {
-    escreverLog(`TIMER POS RESPOSTA JA EXISTE | ${numero}`);
+    logWarn("FINAL", "Timer pos resposta ja existe", { numero });
     return;
   }
 
   if (await estaEmModoHumano(numero)) {
-    escreverLog(`POS RESPOSTA IGNORADO MODO HUMANO | ${numero}`);
+    logInfo("FINAL", "Pos resposta ignorado em modo humano", { numero });
     return;
   }
 
   const atendimento = await obterOuCriarAtendimento(numero);
 
   if (atendimento?.etapa !== "liberado") {
-    escreverLog(`POS RESPOSTA IGNORADO ETAPA | ${numero} | ${atendimento?.etapa || "sem_atendimento"}`);
+    logInfo("FINAL", "Pos resposta ignorado por etapa", { numero, etapa: atendimento?.etapa || "sem_atendimento" });
     return;
   }
 
@@ -825,7 +1007,7 @@ async function iniciarFluxoPosResposta(numero) {
     !config.mensagem_final_ativa ||
     (!config.final_message_image_url && !config.mensagem_final.trim())
   ) {
-    escreverLog(`POS RESPOSTA IGNORADO MENSAGEM FINAL DESATIVADA | ${numero}`);
+    logInfo("FINAL", "Pos resposta ignorado mensagem final desativada", { numero });
     return;
   }
 
@@ -841,14 +1023,14 @@ async function iniciarFluxoPosResposta(numero) {
     try {
       await enviarMensagemFinal(numero);
       await limparAtendimento(numero);
-      escreverLog(`POS RESPOSTA FINALIZADO AUTOMATICO | ${numero}`);
+      logInfo("FINAL", "Pos resposta finalizado automatico", { numero });
     } catch (error) {
-      escreverLog(`ERRO POS RESPOSTA AUTOMATICO | ${numero} | ${error.message}`);
+      logError("FINAL", "Erro pos resposta automatico", { numero, ...resumirErro(error) });
     }
   }, config.delay_mensagem_final_segundos * 1000);
 
   timersMensagemFinal.set(numero, timer);
-  escreverLog(`TIMER FINAL INICIADO | ${numero}`);
+  logInfo("FINAL", "FINAL TIMER INICIADO", { numero });
 }
 
 function usuarioConfirmouEncerramento(mensagemNormalizada) {
@@ -899,7 +1081,7 @@ function pediuOperador(mensagemNormalizada) {
 async function encaminharParaHumano(numero, mensagemTexto) {
   await ativarModoHumano(numero);
   await adicionarNaFila(numero, mensagemTexto);
-  escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
+  logInfo("HUMANO", "Encaminhado para humano", { numero });
 }
 
 app.get("/health", (req, res) => {
@@ -947,6 +1129,12 @@ app.post(
       const configAtual = carregarConfig();
       const imagemAntigaPath = configAtual.final_message_image_path;
 
+      logInfo("SUPABASE", "SUPABASE UPLOAD INICIADO", {
+        path: filePath,
+        mime: req.file.mimetype,
+        tamanho: req.file.size,
+      });
+
       const { error: uploadError } = await supabase.storage
         .from(SUPABASE_BUCKET)
         .upload(filePath, req.file.buffer, {
@@ -958,6 +1146,8 @@ app.post(
         throw uploadError;
       }
 
+      logInfo("SUPABASE", "SUPABASE UPLOAD CONCLUIDO", { path: filePath });
+
       if (imagemAntigaPath) {
         try {
           const { error: removeError } = await supabase.storage
@@ -968,9 +1158,9 @@ app.post(
             throw removeError;
           }
 
-          escreverLog(`IMAGEM ANTIGA REMOVIDA | ${imagemAntigaPath}`);
+          logInfo("SUPABASE", "SUPABASE IMAGEM ANTIGA REMOVIDA", { path: imagemAntigaPath });
         } catch (error) {
-          escreverLog(`ERRO REMOVER IMAGEM ANTIGA | ${imagemAntigaPath} | ${error.message}`);
+          logWarn("SUPABASE", "SUPABASE ERRO REMOVER IMAGEM ANTIGA", { path: imagemAntigaPath, erro: error.message });
         }
       }
 
@@ -985,10 +1175,10 @@ app.post(
         final_message_image_size: req.file.size,
       });
 
-      escreverLog(`IMAGEM MENSAGEM FINAL CONFIGURADA | ${filePath}`);
+      logInfo("SUPABASE", "IMAGEM MENSAGEM FINAL CONFIGURADA", { path: filePath });
       return res.json(config);
     } catch (error) {
-      escreverLog(`ERRO UPLOAD IMAGEM MENSAGEM FINAL | ${error.message}`);
+      logError("SUPABASE", "Erro upload imagem mensagem final", error);
       return res.status(500).json({ erro: "Nao foi possivel enviar a imagem" });
     }
   }
@@ -1011,10 +1201,10 @@ app.delete("/api/config/final-message-image", async (req, res) => {
       final_message_image_size: 0,
     });
 
-    escreverLog("IMAGEM MENSAGEM FINAL REMOVIDA");
+    logInfo("SUPABASE", "SUPABASE IMAGEM REMOVIDA MANUALMENTE");
     return res.json(config);
   } catch (error) {
-    escreverLog(`ERRO REMOVER IMAGEM MENSAGEM FINAL | ${error.message}`);
+    logError("SUPABASE", "Erro remover imagem mensagem final", error);
     return res.status(500).json({ erro: "Nao foi possivel remover a imagem" });
   }
 });
@@ -1033,7 +1223,7 @@ app.post("/api/fila/encerrar", async (req, res) => {
   });
   await iniciarFluxoEncerramento(numero);
 
-  escreverLog(`FLUXO ENCERRAMENTO INICIADO | ${numero}`);
+  logInfo("FINAL", "Fluxo encerramento iniciado", { numero });
   return res.json({ ok: true });
 });
 
@@ -1054,17 +1244,14 @@ app.post("/webhook", async (req, res) => {
     const messageId = message.id || message._data?.id || `${numero}-${mensagemTexto}`;
 
     if (mensagensProcessadas.has(messageId)) {
-      escreverLog(`DUPLICADA IGNORADA | ${numero}`);
+      logInfo("WEBHOOK", "Duplicada ignorada", { numero });
       return res.sendStatus(200);
     }
 
     mensagensProcessadas.add(messageId);
     setTimeout(() => mensagensProcessadas.delete(messageId), 5 * 60 * 1000);
 
-    escreverLog(`MENSAGEM | ${numero} | ${mensagemTexto}`);
-    console.log("=================================");
-    console.log("MENSAGEM RECEBIDA");
-    console.log(mensagemTexto);
+    logInfo("WEBHOOK", "Mensagem recebida", { numero, tamanho: mensagemTexto.length });
 
     const atendimento = await obterOuCriarAtendimento(numero);
 
@@ -1072,22 +1259,22 @@ app.post("/webhook", async (req, res) => {
       cancelarTimerMensagemFinal(numero);
 
       if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
-        escreverLog(`CONFIRMACAO FINAL | ${numero}`);
+        logInfo("FINAL", "CONFIRMACAO FINAL", { numero });
         await enviarMensagemFinal(numero);
         await limparAtendimento(numero);
-        escreverLog(`ENCERRAMENTO CONFIRMADO | ${numero}`);
+        logInfo("FINAL", "Encerramento confirmado", { numero });
         return res.sendStatus(200);
       }
 
       await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
       atendimento.modo = "bot";
       atendimento.etapa = "liberado";
-      escreverLog(`ENCERRAMENTO CANCELADO | ${numero} | ${mensagemTexto}`);
+      logInfo("FINAL", "Encerramento cancelado", { numero });
     }
 
     if (atendimento.etapa === "aguardando_confirmacao_video") {
       if (usuarioConfirmouVideo(mensagemNormalizada)) {
-        escreverLog(`CONFIRMACAO VIDEO POSITIVA | ${numero} | ${mensagemTexto}`);
+        logInfo("VIDEO", "CONFIRMACAO VIDEO POSITIVA", { numero });
         await atualizarAtendimento(numero, {
           modo: "bot",
           etapa: "aguardando_confirmacao_final",
@@ -1097,7 +1284,7 @@ app.post("/webhook", async (req, res) => {
       }
 
       if (usuarioNegouVideo(mensagemNormalizada)) {
-        escreverLog(`CONFIRMACAO VIDEO NEGATIVA | ${numero} | ${mensagemTexto}`);
+        logInfo("VIDEO", "CONFIRMACAO VIDEO NEGATIVA", { numero });
         await encaminharParaHumano(numero, mensagemTexto);
         return res.sendStatus(200);
       }
@@ -1105,28 +1292,28 @@ app.post("/webhook", async (req, res) => {
       await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
       atendimento.modo = "bot";
       atendimento.etapa = "liberado";
-      escreverLog(`CONFIRMACAO VIDEO CONTINUOU ATENDIMENTO | ${numero} | ${mensagemTexto}`);
+      logInfo("VIDEO", "Confirmacao video continuou atendimento", { numero });
     }
 
     if (atendimento.etapa === "aguardando_confirmacao_pos_resposta") {
       cancelarTimerMensagemFinal(numero);
 
       if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
-        escreverLog(`CONFIRMACAO FINAL | ${numero}`);
+        logInfo("FINAL", "CONFIRMACAO FINAL", { numero });
         await enviarMensagemFinal(numero);
         await limparAtendimento(numero);
-        escreverLog(`POS RESPOSTA ENCERRADO PELO USUARIO | ${numero}`);
+        logInfo("FINAL", "Pos resposta encerrado pelo usuario", { numero });
         return res.sendStatus(200);
       }
 
       await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
       atendimento.modo = "bot";
       atendimento.etapa = "liberado";
-      escreverLog(`POS RESPOSTA CONTINUOU ATENDIMENTO | ${numero} | ${mensagemTexto}`);
+      logInfo("FINAL", "Pos resposta continuou atendimento", { numero });
     }
 
     if (await estaEmModoHumano(numero)) {
-      escreverLog(`MODO HUMANO | ${numero}`);
+      logInfo("HUMANO", "Mensagem ignorada em modo humano", { numero });
       return res.sendStatus(200);
     }
 
@@ -1138,7 +1325,7 @@ app.post("/webhook", async (req, res) => {
     if (atendimento.etapa === "inicio") {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
       await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
-      escreverLog(`PEDIU NOME | ${numero}`);
+      logInfo("STATE", "Inicio do cadastro", { numero, etapa: "aguardando_nome" });
       return res.sendStatus(200);
     }
 
@@ -1149,7 +1336,7 @@ app.post("/webhook", async (req, res) => {
       });
 
       await enviarMensagem(numero, "Obrigado. Agora informe seu CPF.");
-      escreverLog(`NOME SALVO | ${numero} | ${mensagemTexto}`);
+      logInfo("STATE", "Nome salvo", { numero });
       return res.sendStatus(200);
     }
 
@@ -1162,7 +1349,7 @@ app.post("/webhook", async (req, res) => {
           `❌ ${validacao.mensagem}\n\nPor favor, informe um CPF válido (apenas números).`
         );
 
-        escreverLog(`CPF INVÁLIDO | ${numero} | ${mensagemTexto}`);
+        logWarn("CPF", "CPF invalido", { numero });
         return res.sendStatus(200);
       }
 
@@ -1176,7 +1363,7 @@ app.post("/webhook", async (req, res) => {
         "✅ CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma você estava."
       );
 
-      escreverLog(`CPF SALVO | ${numero} | ${validacao.cpfFormatado}`);
+      logInfo("CPF", "CPF valido", { numero });
       return res.sendStatus(200);
     }
 
@@ -1187,33 +1374,33 @@ app.post("/webhook", async (req, res) => {
       });
 
       await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
-      escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+      logInfo("STATE", "Site salvo", { numero });
       return res.sendStatus(200);
     }
 
     if (atendimento.etapa === "liberado" && (!atendimento.nome || !atendimento.cpf || !atendimento.site)) {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
       await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
-      escreverLog(`CADASTRO INCOMPLETO | PEDIU NOME | ${numero}`);
+      logWarn("STATE", "Cadastro incompleto pediu nome", { numero });
       return res.sendStatus(200);
     }
 
     if (atendimento.etapa !== "liberado") {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
       await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
-      escreverLog(`ETAPA INVALIDA | PEDIU NOME | ${numero}`);
+      logWarn("STATE", "Etapa invalida pediu nome", { numero, etapa: atendimento.etapa });
       return res.sendStatus(200);
     }
 
-    escreverLog(`BUSCANDO RESPOSTA PLANILHA | ${numero} | ${mensagemTexto}`);
+    logInfo("WEBHOOK", "Buscando resposta planilha", { numero });
     const respostaEncontrada = buscarResposta(mensagemTexto);
 
     if (respostaEncontrada?.texto) {
-      escreverLog(`RESPOSTA PLANILHA ENCONTRADA | ${numero}`);
+      logInfo("WEBHOOK", "Resposta planilha encontrada", { numero });
       await enviarMensagem(numero, respostaEncontrada.texto);
 
       if (respostaEncontrada.linkVideo) {
-        escreverLog(`LINK VIDEO ENCONTRADO | ${numero} | ${respostaEncontrada.linkVideo}`);
+        logInfo("VIDEO", "Video enviado", { numero });
         await enviarMensagem(numero, respostaEncontrada.linkVideo);
         await enviarMensagem(numero, PERGUNTA_VIDEO);
         await atualizarAtendimento(numero, {
@@ -1227,19 +1414,20 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    escreverLog(`CHAMANDO IA | ${numero}`);
+    const inicioIA = Date.now();
+    logInfo("IA", "Chamando IA", { numero });
 
     try {
       const respostaIA = await perguntarIA(mensagemTexto);
 
       if (respostaIA) {
-        escreverLog(`RESPOSTA | ${numero} | ${respostaIA}`);
+        logInfo("IA", "Resposta IA concluida", { numero, duracaoMs: Date.now() - inicioIA });
         await enviarMensagem(numero, respostaIA);
         await iniciarFluxoPosResposta(numero);
         return res.sendStatus(200);
       }
     } catch (errorIA) {
-      escreverLog(`ERRO IA | ${numero} | ${errorIA.message}`);
+      logError("IA", "Erro IA", { numero, ...resumirErro(errorIA) });
     }
 
     await enviarMensagem(
@@ -1249,22 +1437,16 @@ app.post("/webhook", async (req, res) => {
 
     return res.sendStatus(200);
   } catch (error) {
-    escreverLog(`ERRO | ${error.message}`);
+    logError("ERRO", "Erro no webhook", error);
 
-    console.error("=================================");
-    console.error("ERRO NO WEBHOOK");
-
-    if (error.response?.data) {
-      console.error(error.response.data);
-    } else {
-      console.error(error.message);
-    }
+    console.error("ERRO NO WEBHOOK", error.message);
 
     return res.sendStatus(500);
   }
 });
 
 async function start() {
+  rotacionarLogsNoStartup();
   await initDb();
 
   app.listen(PORT, () => {
