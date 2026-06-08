@@ -52,6 +52,9 @@ const CONFIG_PADRAO = {
   pergunta_confirmacao_final: "Te ajudo em algo mais?",
 };
 
+const PERGUNTA_VIDEO =
+  "O vídeo resolveu sua dúvida? Se ainda precisar, posso encaminhar para um operador.";
+
 function garantirPasta(caminho) {
   if (!fs.existsSync(caminho)) {
     fs.mkdirSync(caminho, { recursive: true });
@@ -213,6 +216,13 @@ function limparLinksDoTexto(texto) {
     .trim();
 }
 
+function limparPerguntaVideoDoTexto(texto) {
+  return String(texto || "")
+    .replace(PERGUNTA_VIDEO, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buscarResposta(mensagemCliente) {
   const mensagemNormalizada = normalizarTexto(mensagemCliente);
   const respostas = carregarRespostas();
@@ -238,7 +248,9 @@ function buscarResposta(mensagemCliente) {
 
       melhorPrioridade = prioridade;
       melhorResposta = {
-        texto: linkVideo ? limparLinksDoTexto(item.resposta) : String(item.resposta).trim(),
+        texto: linkVideo
+          ? limparPerguntaVideoDoTexto(limparLinksDoTexto(item.resposta))
+          : String(item.resposta).trim(),
         linkVideo,
       };
     }
@@ -866,6 +878,7 @@ app.post("/webhook", async (req, res) => {
       if (respostaEncontrada.linkVideo) {
         escreverLog(`LINK VIDEO ENCONTRADO | ${numero} | ${respostaEncontrada.linkVideo}`);
         await enviarMensagem(numero, respostaEncontrada.linkVideo);
+        await enviarMensagem(numero, PERGUNTA_VIDEO);
       }
 
       return res.sendStatus(200);
