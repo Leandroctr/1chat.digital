@@ -596,9 +596,8 @@ async function enviarImagem(numero, imageUrl) {
     {
       session: SESSION,
       chatId: numero,
-      file: {
-        url: imageUrl,
-      },
+      file: imageUrl,
+      caption: "",
     },
     {
       headers: { "X-Api-Key": WAHA_API_KEY },
