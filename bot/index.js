@@ -1,10 +1,7 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const multer = require("multer");
 const { Pool } = require("pg");
-const { createClient } = require("@supabase/supabase-js");
-const WebSocket = require("ws");
 const { validarCPF } = require("./validador-cpf");
 const { perguntarIA } = require("./ia");
 const {
@@ -38,6 +35,7 @@ const {
   CONFIG_PADRAO,
   criarConfigService,
 } = require("./src/configService");
+const { criarSupabaseStorage } = require("./src/supabaseStorage");
 
 const app = express();
 
@@ -89,15 +87,6 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "finalmessageassets";
 
-const supabase =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        realtime: {
-          transport: WebSocket,
-        },
-      })
-    : null;
-
 const pool = USAR_POSTGRES
   ? new Pool({ connectionString: process.env.DATABASE_URL })
   : null;
@@ -105,36 +94,22 @@ const {
   enviarMensagem,
   enviarImagem,
 } = criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION });
+const {
+  estaConfigurado: supabaseConfigurado,
+  removerImagemFinal,
+  uploadImagemFinal,
+  uploadImagemMensagemFinal,
+} = criarSupabaseStorage({
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_BUCKET,
+  escreverLog,
+  logInfo,
+  logWarn,
+});
 
 const mensagensProcessadas = new Set();
 const timersMensagemFinal = new Map();
-
-const MIME_IMAGENS_MENSAGEM_FINAL = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
-
-const EXTENSAO_POR_MIME = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
-const uploadImagemMensagemFinal = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-  },
-  fileFilter: (req, file, cb) => {
-    if (!MIME_IMAGENS_MENSAGEM_FINAL.has(file.mimetype)) {
-      cb(new Error("Formato de imagem nao permitido"));
-      return;
-    }
-
-    cb(null, true);
-  },
-});
 
 garantirPasta(PASTA_LOGS);
 garantirArquivoJson(ARQUIVO_ATENDIMENTOS, {});
@@ -869,7 +844,7 @@ app.post(
   uploadImagemMensagemFinal.single("image"),
   async (req, res) => {
     try {
-      if (!supabase) {
+      if (!supabaseConfigurado()) {
         return res.status(500).json({ erro: "Supabase nao configurado" });
       }
 
@@ -877,61 +852,19 @@ app.post(
         return res.status(400).json({ erro: "Imagem nao enviada" });
       }
 
-      const extensao = EXTENSAO_POR_MIME[req.file.mimetype];
-      const filePath = `final-message-${Date.now()}.${extensao}`;
       const configAtual = await carregarConfig();
       const imagemAntigaPath = configAtual.final_message_image_path;
 
-      logInfo("SUPABASE", "Upload imagem final iniciado", {
-        path: filePath,
-        mime: req.file.mimetype,
-        tamanho: req.file.size,
+      const imagem = await uploadImagemFinal({
+        file: req.file,
+        imagemAntigaPath,
       });
+      const config = await salvarConfigImagem(imagem);
 
-      const { error: uploadError } = await supabase.storage
-        .from(SUPABASE_BUCKET)
-        .upload(filePath, req.file.buffer, {
-          contentType: req.file.mimetype,
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      logInfo("SUPABASE", "Upload imagem final concluido", { path: filePath });
-
-      if (imagemAntigaPath) {
-        try {
-          const { error: removeError } = await supabase.storage
-            .from(SUPABASE_BUCKET)
-            .remove([imagemAntigaPath]);
-
-          if (removeError) {
-            throw removeError;
-          }
-
-          escreverLog(`IMAGEM ANTIGA REMOVIDA | ${imagemAntigaPath}`);
-          logInfo("SUPABASE", "Imagem antiga removida", { path: imagemAntigaPath });
-        } catch (error) {
-          escreverLog(`ERRO REMOVER IMAGEM ANTIGA | ${imagemAntigaPath} | ${error.message}`);
-          logWarn("SUPABASE", "Erro remover imagem antiga", { path: imagemAntigaPath, erro: error.message });
-        }
-      }
-
-      const { data } = supabase.storage
-        .from(SUPABASE_BUCKET)
-        .getPublicUrl(filePath);
-
-      const config = await salvarConfigImagem({
-        final_message_image_url: data.publicUrl,
-        final_message_image_path: filePath,
-        final_message_image_mime: req.file.mimetype,
-        final_message_image_size: req.file.size,
+      escreverLog(`IMAGEM MENSAGEM FINAL CONFIGURADA | ${imagem.final_message_image_path}`);
+      logInfo("SUPABASE", "Imagem mensagem final configurada", {
+        path: imagem.final_message_image_path,
       });
-
-      escreverLog(`IMAGEM MENSAGEM FINAL CONFIGURADA | ${filePath}`);
-      logInfo("SUPABASE", "Imagem mensagem final configurada", { path: filePath });
       return res.json(config);
     } catch (error) {
       escreverLog(`ERRO UPLOAD IMAGEM MENSAGEM FINAL | ${error.message}`);
@@ -945,10 +878,8 @@ app.delete("/api/config/final-message-image", async (req, res) => {
   try {
     const configAtual = await carregarConfig();
 
-    if (supabase && configAtual.final_message_image_path) {
-      await supabase.storage
-        .from(SUPABASE_BUCKET)
-        .remove([configAtual.final_message_image_path]);
+    if (supabaseConfigurado() && configAtual.final_message_image_path) {
+      await removerImagemFinal(configAtual.final_message_image_path);
     }
 
     const config = await salvarConfigImagem({
