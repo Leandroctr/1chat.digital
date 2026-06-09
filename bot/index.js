@@ -54,6 +54,7 @@ const {
 } = require("./src/textUtils");
 const { criarDb } = require("./src/db");
 const { criarHumanoService } = require("./src/humano");
+const { registrarAdminRoutes } = require("./src/adminRoutes");
 
 const app = express();
 
@@ -230,110 +231,25 @@ const { encaminharParaHumano } = criarHumanoService({
   escreverLog,
 });
 
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    ok: true,
-    service: "1chat-bot",
-    mode: process.env.NODE_ENV || "local",
-    timestamp: new Date().toISOString(),
-  });
+registrarAdminRoutes({
+  app,
+  publicDir: path.join(__dirname, "public"),
+  carregarFila,
+  carregarConfig,
+  salvarConfig,
+  salvarConfigImagem,
+  uploadImagemMensagemFinal,
+  supabaseConfigurado,
+  uploadImagemFinal,
+  removerImagemFinal,
+  removerDaFila,
+  atualizarAtendimento,
+  iniciarFluxoEncerramento,
+  escreverLog,
+  logInfo,
+  logError,
 });
 
-app.get("/admin", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
-});
-
-app.get("/api/fila", async (req, res) => {
-  const fila = await carregarFila();
-  res.json(fila);
-});
-
-app.get("/api/config", async (req, res) => {
-  res.json(await carregarConfig());
-});
-
-app.post("/api/config", async (req, res) => {
-  const config = await salvarConfig(req.body || {});
-  res.json(config);
-});
-
-app.post(
-  "/api/config/final-message-image",
-  uploadImagemMensagemFinal.single("image"),
-  async (req, res) => {
-    try {
-      if (!supabaseConfigurado()) {
-        return res.status(500).json({ erro: "Supabase nao configurado" });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ erro: "Imagem nao enviada" });
-      }
-
-      const configAtual = await carregarConfig();
-      const imagemAntigaPath = configAtual.final_message_image_path;
-
-      const imagem = await uploadImagemFinal({
-        file: req.file,
-        imagemAntigaPath,
-      });
-      const config = await salvarConfigImagem(imagem);
-
-      escreverLog(`IMAGEM MENSAGEM FINAL CONFIGURADA | ${imagem.final_message_image_path}`);
-      logInfo("SUPABASE", "Imagem mensagem final configurada", {
-        path: imagem.final_message_image_path,
-      });
-      return res.json(config);
-    } catch (error) {
-      escreverLog(`ERRO UPLOAD IMAGEM MENSAGEM FINAL | ${error.message}`);
-      logError("SUPABASE", "Erro upload imagem mensagem final", error);
-      return res.status(500).json({ erro: "Nao foi possivel enviar a imagem" });
-    }
-  }
-);
-
-app.delete("/api/config/final-message-image", async (req, res) => {
-  try {
-    const configAtual = await carregarConfig();
-
-    if (supabaseConfigurado() && configAtual.final_message_image_path) {
-      await removerImagemFinal(configAtual.final_message_image_path);
-    }
-
-    const config = await salvarConfigImagem({
-      final_message_image_url: "",
-      final_message_image_path: "",
-      final_message_image_mime: "",
-      final_message_image_size: 0,
-    });
-
-    escreverLog("IMAGEM MENSAGEM FINAL REMOVIDA");
-    logInfo("SUPABASE", "Imagem removida manualmente");
-    return res.json(config);
-  } catch (error) {
-    escreverLog(`ERRO REMOVER IMAGEM MENSAGEM FINAL | ${error.message}`);
-    logError("SUPABASE", "Erro remover imagem mensagem final", error);
-    return res.status(500).json({ erro: "Nao foi possivel remover a imagem" });
-  }
-});
-
-app.post("/api/fila/encerrar", async (req, res) => {
-  const { numero } = req.body;
-
-  if (!numero) {
-    return res.status(400).json({ erro: "NÃºmero nÃ£o informado" });
-  }
-
-  await removerDaFila(numero);
-  await atualizarAtendimento(numero, {
-    modo: "bot",
-    etapa: "aguardando_confirmacao_final",
-  });
-  await iniciarFluxoEncerramento(numero);
-
-  escreverLog(`FLUXO ENCERRAMENTO INICIADO | ${numero}`);
-  return res.json({ ok: true });
-});
 
 app.post("/webhook", async (req, res) => {
   try {
@@ -435,7 +351,7 @@ app.post("/webhook", async (req, res) => {
 
     if (atendimento.etapa === "inicio") {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-      await enviarMensagem(numero, "OlÃ¡! Para iniciar o atendimento, informe seu nome.");
+      await enviarMensagem(numero, "OlÃƒÂ¡! Para iniciar o atendimento, informe seu nome.");
       escreverLog(`PEDIU NOME | ${numero}`);
       return res.sendStatus(200);
     }
@@ -462,10 +378,10 @@ app.post("/webhook", async (req, res) => {
       if (!validacao.valido) {
         await enviarMensagem(
           numero,
-          `âŒ ${validacao.mensagem}\n\nPor favor, informe um CPF vÃ¡lido (apenas nÃºmeros).`
+          `Ã¢ÂÅ’ ${validacao.mensagem}\n\nPor favor, informe um CPF vÃƒÂ¡lido (apenas nÃƒÂºmeros).`
         );
 
-        escreverLog(`CPF INVÃLIDO | ${numero} | ${mensagemTexto}`);
+        escreverLog(`CPF INVÃƒÂLIDO | ${numero} | ${mensagemTexto}`);
         return res.sendStatus(200);
       }
 
@@ -476,7 +392,7 @@ app.post("/webhook", async (req, res) => {
 
       await enviarMensagem(
         numero,
-        "âœ… CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma vocÃª estava."
+        "Ã¢Å“â€¦ CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma vocÃƒÂª estava."
       );
 
       escreverLog(`CPF SALVO | ${numero} | ${validacao.cpfFormatado}`);
@@ -501,14 +417,14 @@ app.post("/webhook", async (req, res) => {
 
     if (atendimento.etapa === "liberado" && (!atendimento.nome || !atendimento.cpf || !atendimento.site)) {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-      await enviarMensagem(numero, "OlÃ¡! Para iniciar o atendimento, informe seu nome.");
+      await enviarMensagem(numero, "OlÃƒÂ¡! Para iniciar o atendimento, informe seu nome.");
       escreverLog(`CADASTRO INCOMPLETO | PEDIU NOME | ${numero}`);
       return res.sendStatus(200);
     }
 
     if (atendimento.etapa !== "liberado") {
       await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-      await enviarMensagem(numero, "OlÃ¡! Para iniciar o atendimento, informe seu nome.");
+      await enviarMensagem(numero, "OlÃƒÂ¡! Para iniciar o atendimento, informe seu nome.");
       escreverLog(`ETAPA INVALIDA | PEDIU NOME | ${numero}`);
       return res.sendStatus(200);
     }
@@ -556,7 +472,7 @@ app.post("/webhook", async (req, res) => {
 
     await enviarMensagem(
       numero,
-      "NÃ£o encontrei essa informaÃ§Ã£o agora. Vou encaminhar para atendimento humano."
+      "NÃƒÂ£o encontrei essa informaÃƒÂ§ÃƒÂ£o agora. Vou encaminhar para atendimento humano."
     );
 
     return res.sendStatus(200);
