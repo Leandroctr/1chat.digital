@@ -194,6 +194,8 @@ const { initDb } = criarDb({
 const { encaminharParaHumano } = criarHumanoService({
   ativarModoHumano,
   adicionarNaFila,
+  estaEmModoHumano,
+  enviarMensagem,
   escreverLog,
 });
 
