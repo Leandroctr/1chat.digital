@@ -169,7 +169,7 @@ async function enviarImagemMensagemFinal() {
     input.value = "";
     mostrarStatusImagem("Imagem salva.", "success");
   } catch (error) {
-    mostrarStatusImagem("Nao foi possivel enviar a imagem.", "error");
+    mostrarStatusImagem("Não foi possível enviar a imagem.", "error");
   }
 }
 
@@ -189,7 +189,7 @@ async function removerImagemMensagemFinal() {
     atualizarPreviewImagem(config);
     mostrarStatusImagem("Imagem removida.", "success");
   } catch (error) {
-    mostrarStatusImagem("Nao foi possivel remover a imagem.", "error");
+    mostrarStatusImagem("Não foi possível remover a imagem.", "error");
   }
 }
 

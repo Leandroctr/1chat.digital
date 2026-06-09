@@ -20,10 +20,16 @@ function criarMensagemFinalService({
 
   async function enviarMensagemFinal(numero) {
     const config = await carregarConfig();
+    const temImagem = Boolean(config.final_message_image_url);
+    const temTexto = Boolean(config.mensagem_final.trim());
+
+    escreverLog(
+      `FINAL CONFIG | ${numero} | ativa=${config.mensagem_final_ativa ? "sim" : "nao"} | imagem=${temImagem ? "sim" : "nao"} | texto=${temTexto ? "sim" : "nao"}`
+    );
 
     if (
       !config.mensagem_final_ativa ||
-      (!config.final_message_image_url && !config.mensagem_final.trim())
+      (!temImagem && !temTexto)
     ) {
       escreverLog(`MENSAGEM FINAL DESATIVADA | ${numero}`);
       return false;
@@ -36,8 +42,9 @@ function criarMensagemFinalService({
 
     let enviouAlgo = false;
 
-    if (config.final_message_image_url) {
+    if (temImagem) {
       try {
+        escreverLog(`FINAL ENVIANDO IMAGEM | ${numero}`);
         await enviarImagem(numero, config.final_message_image_url);
         enviouAlgo = true;
         escreverLog(`IMAGEM MENSAGEM FINAL ENVIADA | ${numero}`);
@@ -46,9 +53,11 @@ function criarMensagemFinalService({
       }
     }
 
-    if (config.mensagem_final.trim()) {
+    if (temTexto) {
+      escreverLog(`FINAL ENVIANDO TEXTO | ${numero}`);
       await enviarMensagem(numero, config.mensagem_final);
       enviouAlgo = true;
+      escreverLog(`FINAL TEXTO ENVIADO | ${numero}`);
     }
 
     if (!enviouAlgo) {
