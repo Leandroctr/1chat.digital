@@ -109,7 +109,7 @@ function registrarAdminRoutes({
     const { numero } = req.body;
 
     if (!numero) {
-      return res.status(400).json({ erro: "NÃƒÂºmero nÃƒÂ£o informado" });
+      return res.status(400).json({ erro: "Número não informado" });
     }
 
     await removerDaFila(numero);

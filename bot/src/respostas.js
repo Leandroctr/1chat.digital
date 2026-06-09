@@ -2,7 +2,7 @@ const fs = require("fs");
 const XLSX = require("xlsx");
 
 const PERGUNTA_VIDEO =
-  "O vÃ­deo resolveu sua dÃºvida? Se ainda precisar, posso encaminhar para uma operadora.";
+  "O vídeo resolveu sua dúvida? Se ainda precisar, posso encaminhar para uma operadora.";
 
 function criarRespostasService({ ARQUIVO_RESPOSTAS, escreverLog, normalizarTexto }) {
   function carregarRespostas() {

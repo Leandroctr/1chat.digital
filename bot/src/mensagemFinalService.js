@@ -30,7 +30,7 @@ function criarMensagemFinalService({
     }
 
     if (!(await podeEnviarMensagemFinal(numero))) {
-      escreverLog(`MENSAGEM FINAL JÃ ENVIADA HOJE | ${numero}`);
+      escreverLog(`MENSAGEM FINAL JÁ ENVIADA HOJE | ${numero}`);
       return false;
     }
 
