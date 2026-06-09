@@ -1,5 +1,4 @@
 const express = require("express");
-const axios = require("axios");
 const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
@@ -31,6 +30,7 @@ const {
   carregarJson,
   salvarJson,
 } = require("./src/jsonStore");
+const { criarWahaClient } = require("./src/waha");
 
 const app = express();
 
@@ -94,6 +94,10 @@ const supabase =
 const pool = USAR_POSTGRES
   ? new Pool({ connectionString: process.env.DATABASE_URL })
   : null;
+const {
+  enviarMensagem,
+  enviarImagem,
+} = criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION });
 
 const mensagensProcessadas = new Set();
 const timersMensagemFinal = new Map();
@@ -612,39 +616,6 @@ async function removerDaFila(numero) {
 
   const fila = await carregarFila();
   await salvarFila(fila.filter((item) => item.numero !== numero));
-}
-
-async function enviarMensagem(numero, texto) {
-  await axios.post(
-    `${WAHA_URL}/api/sendText`,
-    {
-      session: SESSION,
-      chatId: numero,
-      text: texto,
-    },
-    {
-      headers: { "X-Api-Key": WAHA_API_KEY },
-    }
-  );
-}
-
-async function enviarImagem(numero, imageUrl) {
-  await axios.post(
-    `${WAHA_URL}/api/sendImage`,
-    {
-      session: SESSION,
-      chatId: numero,
-      file: {
-        url: imageUrl,
-      },
-      caption: "",
-    },
-    {
-      headers: {
-        "X-Api-Key": WAHA_API_KEY,
-      },
-    }
-  );
 }
 
 function normalizarConfig(config) {
