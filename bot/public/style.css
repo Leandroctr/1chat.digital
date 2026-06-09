@@ -106,6 +106,26 @@ body {
   margin-top: 6px;
 }
 
+.sidebar-footer form {
+  margin: 14px 0 0;
+}
+
+.logout-button {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .content {
   flex: 1;
   min-width: 0;

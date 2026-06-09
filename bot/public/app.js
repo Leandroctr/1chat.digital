@@ -15,6 +15,17 @@ const API_BASE_URL =
   localStorage.getItem("API_BASE_URL") ||
   "";
 
+async function fetchAdmin(url, options) {
+  const response = await fetch(url, options);
+
+  if (response.status === 401) {
+    window.location.href = "/admin/login";
+    throw new Error("Login necessario");
+  }
+
+  return response;
+}
+
 function mostrarSecao(secao) {
   const secoes = {
     atendimentos: document.getElementById("sectionAtendimentos"),
@@ -70,7 +81,7 @@ function atualizarPreviewImagem(config) {
 
 async function carregarConfig() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/config`);
+    const response = await fetchAdmin(`${API_BASE_URL}/api/config`);
     const config = await response.json();
 
     document.getElementById("mensagemFinalAtiva").checked =
@@ -108,7 +119,7 @@ async function salvarConfig(event) {
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/config`, {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/config`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -155,7 +166,7 @@ async function enviarImagemMensagemFinal() {
   try {
     mostrarStatusImagem("Enviando imagem...");
 
-    const response = await fetch(`${API_BASE_URL}/api/config/final-message-image`, {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/config/final-message-image`, {
       method: "POST",
       body: formData,
     });
@@ -177,7 +188,7 @@ async function removerImagemMensagemFinal() {
   try {
     mostrarStatusImagem("Removendo imagem...");
 
-    const response = await fetch(`${API_BASE_URL}/api/config/final-message-image`, {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/config/final-message-image`, {
       method: "DELETE",
     });
 
@@ -202,7 +213,7 @@ async function carregarFila() {
   let fila = [];
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/fila`);
+    const response = await fetchAdmin(`${API_BASE_URL}/api/fila`);
     fila = await response.json();
   } catch (error) {
     tbody.innerHTML = `
@@ -265,7 +276,7 @@ async function encerrarAtendimento(numero) {
 
   if (!confirmar) return;
 
-  await fetch(`${API_BASE_URL}/api/fila/encerrar`, {
+  await fetchAdmin(`${API_BASE_URL}/api/fila/encerrar`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

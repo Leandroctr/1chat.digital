@@ -58,7 +58,10 @@ const { registrarWebhookRoute } = require("./src/webhookRoute");
 const { configurarMiddlewares } = require("./src/appMiddleware");
 const {
   PORT,
+  ADMIN_PASSWORD,
+  ADMIN_USER,
   SESSION,
+  SESSION_SECRET,
   SUPABASE_BUCKET,
   SUPABASE_SERVICE_ROLE_KEY,
   SUPABASE_URL,
@@ -72,6 +75,7 @@ const app = express();
 configurarMiddlewares({
   app,
   publicDir: path.join(__dirname, "public"),
+  SESSION_SECRET,
   logWarn,
 });
 
@@ -213,8 +217,11 @@ registrarAdminRoutes({
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
+  ADMIN_PASSWORD,
+  ADMIN_USER,
   escreverLog,
   logInfo,
+  logWarn,
   logError,
 });
 

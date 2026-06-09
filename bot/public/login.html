@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1Chat Digital | Login</title>
+  <link rel="stylesheet" href="/login.css" />
+</head>
+<body>
+  <main class="login-page">
+    <section class="login-card">
+      <div class="brand">
+        <div class="logo">1C</div>
+        <div>
+          <h1>1Chat</h1>
+          <span>Painel administrativo</span>
+        </div>
+      </div>
+
+      <form action="/admin/login" method="POST" class="login-form">
+        <label>
+          <span>Usuário</span>
+          <input name="usuario" type="text" autocomplete="username" required autofocus />
+        </label>
+
+        <label>
+          <span>Senha</span>
+          <input name="senha" type="password" autocomplete="current-password" required />
+        </label>
+
+        <p id="loginErro" class="login-error" hidden></p>
+
+        <button type="submit">Entrar</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const erro = new URLSearchParams(window.location.search).get("erro");
+    const mensagens = {
+      config: "Login indisponível. Configure ADMIN_USER e ADMIN_PASSWORD no Railway.",
+      credenciais: "Usuário ou senha inválidos. Confira os dados e tente novamente.",
+    };
+    const texto = mensagens[erro];
+    const elemento = document.getElementById("loginErro");
+
+    if (texto && elemento) {
+      elemento.textContent = texto;
+      elemento.hidden = false;
+    }
+  </script>
+</body>
+</html>
