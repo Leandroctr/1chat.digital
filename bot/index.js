@@ -43,7 +43,8 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use((err, req, res, next) => {
   if (err.status === 413 || err.type === "entity.too.large") {
- console.log(`WEBHOOK GRANDE IGNORADO | ${req.originalUrl}`);
+    console.log(`WEBHOOK GRANDE IGNORADO | ${req.originalUrl}`);
+    logWarn("WEBHOOK", "Webhook grande ignorado", { url: req.originalUrl });
     return res.sendStatus(200);
   }
 
@@ -78,6 +79,8 @@ const timersMensagemFinal = new Map();
 const ARQUIVO_RESPOSTAS = path.join(__dirname, "data", "respostas.xlsx");
 const ARQUIVO_CONFIG = path.join(__dirname, "data", "config.json");
 const PASTA_LOGS = path.join(__dirname, "logs");
+const ARQUIVO_APP_LOG = path.join(PASTA_LOGS, "app.log");
+const ARQUIVO_ERROR_LOG = path.join(PASTA_LOGS, "error.log");
 const ARQUIVO_ATENDIMENTOS = path.join(__dirname, "data", "atendimentos.json");
 const ARQUIVO_FILA = path.join(__dirname, "data", "fila.json");
 const ARQUIVO_FINAL_MESSAGE_LOG = path.join(__dirname, "data", "final-message-log.json");
@@ -160,6 +163,13 @@ function horarioAtual() {
   return new Date().toLocaleString("pt-BR");
 }
 
+function timestampLog() {
+  const data = new Date();
+  const pad = (valor) => String(valor).padStart(2, "0");
+
+  return `${data.getFullYear()}-${pad(data.getMonth() + 1)}-${pad(data.getDate())} ${pad(data.getHours())}:${pad(data.getMinutes())}:${pad(data.getSeconds())}`;
+}
+
 function dataBanco(valor) {
   if (!valor) return null;
   if (valor instanceof Date) return valor;
@@ -168,10 +178,128 @@ function dataBanco(valor) {
   return Number.isNaN(data.getTime()) ? null : data;
 }
 
-function escreverLog(texto) {
+function sanitizarLog(valor) {
+  return String(valor || "")
+    .replace(/SUPABASE_SERVICE_ROLE_KEY=[^\s|]+/gi, "SUPABASE_SERVICE_ROLE_KEY=[redacted]")
+    .replace(/WAHA_API_KEY=[^\s|]+/gi, "WAHA_API_KEY=[redacted]")
+    .replace(/DATABASE_URL=[^\s|]+/gi, "DATABASE_URL=[redacted]")
+    .replace(/token=[^\s|]+/gi, "token=[redacted]")
+    .slice(0, 700);
+}
+
+function escreverLinhaLog(arquivo, linha) {
   garantirPasta(PASTA_LOGS);
-  const arquivoLog = path.join(PASTA_LOGS, `${dataAtual()}.log`);
-  fs.appendFileSync(arquivoLog, `[${horarioAtual()}] ${texto}\n`, "utf8");
+  fs.appendFileSync(arquivo, `${linha}\n`, "utf8");
+}
+
+function escreverLog(texto) {
+  const mensagem = sanitizarLog(texto);
+  const categoria = mensagem.startsWith("ERRO") ? "ERRO" : "LOG";
+  const nivel = categoria === "ERRO" ? "ERROR" : "INFO";
+  const linha = `[${timestampLog()}] [${nivel}] [${categoria}] ${mensagem}`;
+
+  escreverLinhaLog(ARQUIVO_APP_LOG, linha);
+
+  if (nivel === "ERROR") {
+    escreverLinhaLog(ARQUIVO_ERROR_LOG, linha);
+  }
+}
+
+function logInfo(categoria, mensagem, dados = {}) {
+  const extras = Object.entries(dados)
+    .filter(([chave, valor]) => valor !== undefined && valor !== null && !/key|token|secret|password|database_url/i.test(chave))
+    .map(([chave, valor]) => `${chave}=${sanitizarLog(valor)}`)
+    .join(" | ");
+
+  escreverLinhaLog(
+    ARQUIVO_APP_LOG,
+    `[${timestampLog()}] [INFO] [${categoria}] ${sanitizarLog(mensagem)}${extras ? ` | ${extras}` : ""}`
+  );
+}
+
+function logWarn(categoria, mensagem, dados = {}) {
+  const extras = Object.entries(dados)
+    .filter(([chave, valor]) => valor !== undefined && valor !== null && !/key|token|secret|password|database_url/i.test(chave))
+    .map(([chave, valor]) => `${chave}=${sanitizarLog(valor)}`)
+    .join(" | ");
+
+  escreverLinhaLog(
+    ARQUIVO_APP_LOG,
+    `[${timestampLog()}] [WARN] [${categoria}] ${sanitizarLog(mensagem)}${extras ? ` | ${extras}` : ""}`
+  );
+}
+
+function logError(categoria, mensagem, error, dados = {}) {
+  const detalhes = {
+    ...dados,
+    erro: error?.message || error,
+    status: error?.response?.status,
+  };
+  const extras = Object.entries(detalhes)
+    .filter(([chave, valor]) => valor !== undefined && valor !== null && !/key|token|secret|password|database_url/i.test(chave))
+    .map(([chave, valor]) => `${chave}=${sanitizarLog(valor)}`)
+    .join(" | ");
+  const linha = `[${timestampLog()}] [ERROR] [${categoria}] ${sanitizarLog(mensagem)}${extras ? ` | ${extras}` : ""}`;
+
+  escreverLinhaLog(ARQUIVO_APP_LOG, linha);
+  escreverLinhaLog(ARQUIVO_ERROR_LOG, linha);
+}
+
+function logState(numero, etapaAnterior, etapaNova, motivo) {
+  escreverLinhaLog(
+    ARQUIVO_APP_LOG,
+    `[${timestampLog()}] [STATE] numero=${sanitizarLog(numero)} | ${sanitizarLog(etapaAnterior || "-")} -> ${sanitizarLog(etapaNova || "-")} | motivo=${sanitizarLog(motivo || "atualizar_atendimento")}`
+  );
+}
+
+function rotacionarArquivoLog(nomeBase) {
+  const arquivoAtual = path.join(PASTA_LOGS, `${nomeBase}.log`);
+
+  if (!fs.existsSync(arquivoAtual)) {
+    fs.writeFileSync(arquivoAtual, "", "utf8");
+    return;
+  }
+
+  const dataArquivo = fs.statSync(arquivoAtual).mtime.toISOString().split("T")[0];
+
+  if (dataArquivo === dataAtual()) return;
+
+  const destino = path.join(PASTA_LOGS, `${nomeBase}-${dataArquivo}.log`);
+
+  if (fs.existsSync(destino)) {
+    fs.unlinkSync(destino);
+  }
+
+  fs.renameSync(arquivoAtual, destino);
+  fs.writeFileSync(arquivoAtual, "", "utf8");
+}
+
+function limparLogsAntigos() {
+  const hoje = dataAtual();
+  const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const manter = new Set(["app.log", "error.log", `app-${hoje}.log`, `error-${hoje}.log`, `app-${ontem}.log`, `error-${ontem}.log`]);
+
+  for (const arquivo of fs.readdirSync(PASTA_LOGS)) {
+    if (/^(app|error)-\d{4}-\d{2}-\d{2}\.log$/.test(arquivo) && !manter.has(arquivo)) {
+      fs.unlinkSync(path.join(PASTA_LOGS, arquivo));
+    }
+  }
+}
+
+function rotacionarLogsNoStartup() {
+  try {
+    garantirPasta(PASTA_LOGS);
+    rotacionarArquivoLog("app");
+    rotacionarArquivoLog("error");
+    limparLogsAntigos();
+    logInfo("LOG", "Rotacao de logs executada");
+  } catch (error) {
+    try {
+      logWarn("LOG", "Falha ao limpar logs antigos", { erro: error.message });
+    } catch {
+      console.error("Falha ao rotacionar logs", error.message);
+    }
+  }
 }
 
 function carregarJson(caminho, padrao) {
@@ -440,10 +568,18 @@ async function atualizarAtendimento(numero, novosDados) {
       ]
     );
 
-    return mapearAtendimento(rows[0]);
+    const atualizado = mapearAtendimento(rows[0]);
+
+    if (novosDados.etapa && atual.etapa !== atualizado.etapa) {
+      logState(numero, atual.etapa, atualizado.etapa, "atualizar_atendimento");
+    }
+
+    return atualizado;
   }
 
   const atendimentos = await carregarAtendimentos();
+  const etapaAnterior = atendimentos[numero]?.etapa;
+
   atendimentos[numero] = {
     ...(atendimentos[numero] || {}),
     ...novosDados,
@@ -451,6 +587,11 @@ async function atualizarAtendimento(numero, novosDados) {
   };
 
   await salvarAtendimentos(atendimentos);
+
+  if (novosDados.etapa && etapaAnterior !== atendimentos[numero].etapa) {
+    logState(numero, etapaAnterior, atendimentos[numero].etapa, "atualizar_atendimento");
+  }
+
   return atendimentos[numero];
 }
 
@@ -947,6 +1088,12 @@ app.post(
       const configAtual = carregarConfig();
       const imagemAntigaPath = configAtual.final_message_image_path;
 
+      logInfo("SUPABASE", "Upload imagem final iniciado", {
+        path: filePath,
+        mime: req.file.mimetype,
+        tamanho: req.file.size,
+      });
+
       const { error: uploadError } = await supabase.storage
         .from(SUPABASE_BUCKET)
         .upload(filePath, req.file.buffer, {
@@ -957,6 +1104,8 @@ app.post(
       if (uploadError) {
         throw uploadError;
       }
+
+      logInfo("SUPABASE", "Upload imagem final concluido", { path: filePath });
 
       if (imagemAntigaPath) {
         try {
@@ -969,8 +1118,10 @@ app.post(
           }
 
           escreverLog(`IMAGEM ANTIGA REMOVIDA | ${imagemAntigaPath}`);
+          logInfo("SUPABASE", "Imagem antiga removida", { path: imagemAntigaPath });
         } catch (error) {
           escreverLog(`ERRO REMOVER IMAGEM ANTIGA | ${imagemAntigaPath} | ${error.message}`);
+          logWarn("SUPABASE", "Erro remover imagem antiga", { path: imagemAntigaPath, erro: error.message });
         }
       }
 
@@ -986,9 +1137,11 @@ app.post(
       });
 
       escreverLog(`IMAGEM MENSAGEM FINAL CONFIGURADA | ${filePath}`);
+      logInfo("SUPABASE", "Imagem mensagem final configurada", { path: filePath });
       return res.json(config);
     } catch (error) {
       escreverLog(`ERRO UPLOAD IMAGEM MENSAGEM FINAL | ${error.message}`);
+      logError("SUPABASE", "Erro upload imagem mensagem final", error);
       return res.status(500).json({ erro: "Nao foi possivel enviar a imagem" });
     }
   }
@@ -1012,9 +1165,11 @@ app.delete("/api/config/final-message-image", async (req, res) => {
     });
 
     escreverLog("IMAGEM MENSAGEM FINAL REMOVIDA");
+    logInfo("SUPABASE", "Imagem removida manualmente");
     return res.json(config);
   } catch (error) {
     escreverLog(`ERRO REMOVER IMAGEM MENSAGEM FINAL | ${error.message}`);
+    logError("SUPABASE", "Erro remover imagem mensagem final", error);
     return res.status(500).json({ erro: "Nao foi possivel remover a imagem" });
   }
 });
@@ -1228,18 +1383,22 @@ app.post("/webhook", async (req, res) => {
     }
 
     escreverLog(`CHAMANDO IA | ${numero}`);
+    logInfo("IA", "Chamada IA iniciada", { numero });
+    const inicioIA = Date.now();
 
     try {
       const respostaIA = await perguntarIA(mensagemTexto);
 
       if (respostaIA) {
         escreverLog(`RESPOSTA | ${numero} | ${respostaIA}`);
+        logInfo("IA", "Resposta IA concluida", { numero, duracaoMs: Date.now() - inicioIA });
         await enviarMensagem(numero, respostaIA);
         await iniciarFluxoPosResposta(numero);
         return res.sendStatus(200);
       }
     } catch (errorIA) {
       escreverLog(`ERRO IA | ${numero} | ${errorIA.message}`);
+      logError("IA", "Erro IA", errorIA, { numero, duracaoMs: Date.now() - inicioIA });
     }
 
     await enviarMensagem(
@@ -1250,6 +1409,7 @@ app.post("/webhook", async (req, res) => {
     return res.sendStatus(200);
   } catch (error) {
     escreverLog(`ERRO | ${error.message}`);
+    logError("ERRO", "Erro no webhook", error);
 
     console.error("=================================");
     console.error("ERRO NO WEBHOOK");
@@ -1265,6 +1425,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 async function start() {
+  rotacionarLogsNoStartup();
   await initDb();
 
   app.listen(PORT, () => {
