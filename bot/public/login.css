@@ -46,9 +46,25 @@ body {
   margin-bottom: 30px;
 }
 
-.logo {
+.brand-logo {
   display: flex;
-  width: 52px;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 52px;
+  min-height: 52px;
+}
+
+.brand-logo img {
+  display: block;
+  width: auto;
+  max-width: 220px;
+  max-height: 82px;
+  object-fit: contain;
+}
+
+.brand-logo span {
+  display: flex;
+  width: 78px;
   height: 52px;
   align-items: center;
   justify-content: center;
