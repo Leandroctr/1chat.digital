@@ -24,6 +24,9 @@
         <button class="menu-item" type="button" data-section="mensagemFinal" onclick="mostrarSecao('mensagemFinal')">
           Mensagem Final
         </button>
+        <button class="menu-item" type="button" data-section="metricas" onclick="mostrarSecao('metricas')">
+          Métricas
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -174,6 +177,82 @@
               <span id="configStatus" class="status-message"></span>
             </div>
           </form>
+        </section>
+      </section>
+
+      <section id="sectionMetricas" class="page-section">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Indicadores</p>
+            <h2>Métricas</h2>
+            <span>Acompanhe os encaminhamentos para atendimento humano no dia.</span>
+          </div>
+
+          <button class="primary" onclick="carregarMetricas()">Atualizar métricas</button>
+        </header>
+
+        <section class="metrics metrics-summary">
+          <div class="metric-card metric-card-large">
+            <span>Atendimentos humanos hoje</span>
+            <strong id="totalHumanoHoje">0</strong>
+            <small id="metricasStatus">Atualizado ao abrir a aba</small>
+          </div>
+        </section>
+
+        <p id="metricasEmpty" class="empty metricas-empty" hidden>
+          Nenhum atendimento humano registrado hoje.
+        </p>
+
+        <section class="metrics-tables">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Chamados por site</h3>
+                <p>Total de encaminhamentos agrupados por site identificado.</p>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Site</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="metricasSiteBody">
+                  <tr>
+                    <td colspan="2" class="empty">Carregando métricas...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Chamados por motivo</h3>
+                <p>Total de encaminhamentos agrupados pelo motivo detectado.</p>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Motivo</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="metricasMotivoBody">
+                  <tr>
+                    <td colspan="2" class="empty">Carregando métricas...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </section>
     </main>

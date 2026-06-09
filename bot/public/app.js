@@ -30,6 +30,7 @@ function mostrarSecao(secao) {
   const secoes = {
     atendimentos: document.getElementById("sectionAtendimentos"),
     mensagemFinal: document.getElementById("sectionMensagemFinal"),
+    metricas: document.getElementById("sectionMetricas"),
   };
 
   Object.entries(secoes).forEach(([nome, elemento]) => {
@@ -41,6 +42,10 @@ function mostrarSecao(secao) {
   document.querySelectorAll(".menu-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.section === secao);
   });
+
+  if (secao === "metricas") {
+    carregarMetricas();
+  }
 }
 
 function mostrarStatusConfig(texto, tipo = "info") {
@@ -267,6 +272,72 @@ async function carregarFila() {
       `;
     })
     .join("");
+}
+
+function renderizarTabelaMetricas(tbody, itens, colunaNome, vazioTexto) {
+  if (!tbody) return;
+
+  if (!itens?.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="2" class="empty">${vazioTexto}</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = itens
+    .map((item) => `
+      <tr>
+        <td>${item[colunaNome] || "desconhecido"}</td>
+        <td><strong>${item.total || 0}</strong></td>
+      </tr>
+    `)
+    .join("");
+}
+
+async function carregarMetricas() {
+  const totalHumanoHoje = document.getElementById("totalHumanoHoje");
+  const metricasStatus = document.getElementById("metricasStatus");
+  const metricasEmpty = document.getElementById("metricasEmpty");
+  const siteBody = document.getElementById("metricasSiteBody");
+  const motivoBody = document.getElementById("metricasMotivoBody");
+
+  try {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/metrics/today`);
+
+    if (!response.ok) {
+      throw new Error("Erro ao carregar metricas");
+    }
+
+    const metricas = await response.json();
+    const total = metricas.total_humano_hoje || 0;
+
+    totalHumanoHoje.textContent = total;
+    metricasStatus.textContent = `Atualizado às ${agora()}`;
+    metricasEmpty.hidden = total > 0;
+
+    renderizarTabelaMetricas(
+      siteBody,
+      metricas.por_site,
+      "site",
+      "Nenhum atendimento humano registrado hoje."
+    );
+    renderizarTabelaMetricas(
+      motivoBody,
+      metricas.por_motivo,
+      "motivo",
+      "Nenhum atendimento humano registrado hoje."
+    );
+  } catch (error) {
+    totalHumanoHoje.textContent = "0";
+    metricasStatus.textContent = "Não foi possível carregar as métricas.";
+    metricasEmpty.hidden = false;
+    metricasEmpty.textContent = "Nenhum atendimento humano registrado hoje.";
+
+    renderizarTabelaMetricas(siteBody, [], "site", "Não foi possível carregar as métricas.");
+    renderizarTabelaMetricas(motivoBody, [], "motivo", "Não foi possível carregar as métricas.");
+  }
 }
 
 async function encerrarAtendimento(numero) {

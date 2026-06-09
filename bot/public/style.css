@@ -223,6 +223,27 @@ body {
   color: var(--muted);
 }
 
+.metrics-summary {
+  grid-template-columns: minmax(260px, 420px);
+}
+
+.metric-card-large strong {
+  font-size: 44px;
+}
+
+.metricas-empty {
+  margin: 0 0 24px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  background: white;
+}
+
+.metrics-tables {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
 .green {
   color: var(--green);
 }
@@ -463,6 +484,11 @@ td {
 @media (max-width: 1100px) {
   .metrics {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .metrics-summary,
+  .metrics-tables {
+    grid-template-columns: 1fr;
   }
 
   .config-grid {
