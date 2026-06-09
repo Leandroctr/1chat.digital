@@ -9,6 +9,16 @@ const { createClient } = require("@supabase/supabase-js");
 const WebSocket = require("ws");
 const { validarCPF } = require("./validador-cpf");
 const { perguntarIA } = require("./ia");
+const {
+  ARQUIVO_RESPOSTAS,
+  ARQUIVO_CONFIG,
+  PASTA_LOGS,
+  ARQUIVO_APP_LOG,
+  ARQUIVO_ERROR_LOG,
+  ARQUIVO_ATENDIMENTOS,
+  ARQUIVO_FILA,
+  ARQUIVO_FINAL_MESSAGE_LOG,
+} = require("./src/paths");
 
 const app = express();
 
@@ -75,15 +85,6 @@ const pool = USAR_POSTGRES
 
 const mensagensProcessadas = new Set();
 const timersMensagemFinal = new Map();
-
-const ARQUIVO_RESPOSTAS = path.join(__dirname, "data", "respostas.xlsx");
-const ARQUIVO_CONFIG = path.join(__dirname, "data", "config.json");
-const PASTA_LOGS = path.join(__dirname, "logs");
-const ARQUIVO_APP_LOG = path.join(PASTA_LOGS, "app.log");
-const ARQUIVO_ERROR_LOG = path.join(PASTA_LOGS, "error.log");
-const ARQUIVO_ATENDIMENTOS = path.join(__dirname, "data", "atendimentos.json");
-const ARQUIVO_FILA = path.join(__dirname, "data", "fila.json");
-const ARQUIVO_FINAL_MESSAGE_LOG = path.join(__dirname, "data", "final-message-log.json");
 
 const CONFIG_PADRAO = {
   mensagem_final_ativa: false,
