@@ -920,11 +920,13 @@ function cancelarTimerMensagemFinal(numero) {
   }
 }
 
-async function iniciarFluxoEncerramento(numero) {
+async function iniciarPerguntaFinal(numero, origem) {
   cancelarTimerMensagemFinal(numero);
 
   const config = carregarConfig();
+
   await enviarMensagem(numero, config.pergunta_confirmacao_final);
+  escreverLog(`FINAL PERGUNTA ENVIADA | ${numero} | ${origem}`);
 
   const timer = setTimeout(async () => {
     timersMensagemFinal.delete(numero);
@@ -932,14 +934,18 @@ async function iniciarFluxoEncerramento(numero) {
     try {
       await enviarMensagemFinal(numero);
       await limparAtendimento(numero);
-      escreverLog(`ENCERRAMENTO AUTOMÁTICO | ${numero}`);
+      escreverLog(`FINAL AUTOMATICO | ${numero} | ${origem}`);
     } catch (error) {
-      escreverLog(`ERRO MENSAGEM FINAL AUTOMÁTICA | ${numero} | ${error.message}`);
+      escreverLog(`ERRO FINAL AUTOMATICO | ${numero} | ${origem} | ${error.message}`);
     }
   }, config.delay_mensagem_final_segundos * 1000);
 
   timersMensagemFinal.set(numero, timer);
-  escreverLog(`TIMER FINAL INICIADO | ${numero}`);
+  escreverLog(`TIMER FINAL INICIADO | ${numero} | ${origem}`);
+}
+
+async function iniciarFluxoEncerramento(numero) {
+  await iniciarPerguntaFinal(numero, "encerramento_humano");
 }
 
 async function iniciarFluxoPosResposta(numero) {
@@ -974,22 +980,7 @@ async function iniciarFluxoPosResposta(numero) {
     modo: "bot",
     etapa: "aguardando_confirmacao_pos_resposta",
   });
-  await enviarMensagem(numero, config.pergunta_confirmacao_final);
-
-  const timer = setTimeout(async () => {
-    timersMensagemFinal.delete(numero);
-
-    try {
-      await enviarMensagemFinal(numero);
-      await limparAtendimento(numero);
-      escreverLog(`POS RESPOSTA FINALIZADO AUTOMATICO | ${numero}`);
-    } catch (error) {
-      escreverLog(`ERRO POS RESPOSTA AUTOMATICO | ${numero} | ${error.message}`);
-    }
-  }, config.delay_mensagem_final_segundos * 1000);
-
-  timersMensagemFinal.set(numero, timer);
-  escreverLog(`TIMER FINAL INICIADO | ${numero}`);
+  await iniciarPerguntaFinal(numero, "pos_resposta");
 }
 
 function usuarioConfirmouEncerramento(mensagemNormalizada) {
@@ -1247,7 +1238,7 @@ app.post("/webhook", async (req, res) => {
           modo: "bot",
           etapa: "aguardando_confirmacao_final",
         });
-        await iniciarFluxoEncerramento(numero);
+        await iniciarPerguntaFinal(numero, "confirmacao_video");
         return res.sendStatus(200);
       }
 
