@@ -1,6 +1,5 @@
 const express = require("express");
 const path = require("path");
-const fs = require("fs");
 const { Pool } = require("pg");
 const { validarCPF } = require("./validador-cpf");
 const { perguntarIA } = require("./ia");
@@ -153,8 +152,6 @@ const {
   salvarJson,
 });
 const {
-  carregarAtendimentos,
-  salvarAtendimentos,
   obterOuCriarAtendimento,
   atualizarAtendimento,
   estaEmModoHumano,
@@ -172,7 +169,6 @@ const {
 });
 const {
   carregarFila,
-  salvarFila,
   adicionarNaFila,
   removerDaFila,
 } = criarFilaService({
