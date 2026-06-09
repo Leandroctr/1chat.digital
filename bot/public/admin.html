@@ -14,13 +14,12 @@
           <img
             src="/assets/logo.png"
             alt="1Chat"
-            onerror="this.hidden=true; this.nextElementSibling.hidden=false;"
+            onerror="this.hidden=true; this.parentElement.classList.add('logo-failed');"
           />
-          <span hidden>1C</span>
-        </div>
-        <div>
-          <h1>1Chat</h1>
-          <span>Central de atendimento</span>
+          <div class="brand-fallback">
+            <h1>1Chat</h1>
+            <span>Central de atendimento</span>
+          </div>
         </div>
       </div>
 
