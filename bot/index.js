@@ -25,6 +25,12 @@ const {
   logState,
   rotacionarLogsNoStartup,
 } = require("./src/logger");
+const {
+  garantirPasta,
+  garantirArquivoJson,
+  carregarJson,
+  salvarJson,
+} = require("./src/jsonStore");
 
 const app = express();
 
@@ -133,20 +139,6 @@ const uploadImagemMensagemFinal = multer({
 const PERGUNTA_VIDEO =
   "O vídeo resolveu sua dúvida? Se ainda precisar, posso encaminhar para uma operadora.";
 
-function garantirPasta(caminho) {
-  if (!fs.existsSync(caminho)) {
-    fs.mkdirSync(caminho, { recursive: true });
-  }
-}
-
-function garantirArquivoJson(caminho, padrao) {
-  garantirPasta(path.dirname(caminho));
-
-  if (!fs.existsSync(caminho)) {
-    fs.writeFileSync(caminho, JSON.stringify(padrao, null, 2), "utf8");
-  }
-}
-
 garantirPasta(PASTA_LOGS);
 garantirArquivoJson(ARQUIVO_ATENDIMENTOS, {});
 garantirArquivoJson(ARQUIVO_FILA, []);
@@ -180,20 +172,6 @@ function dataBanco(valor) {
 
   const data = new Date(valor);
   return Number.isNaN(data.getTime()) ? null : data;
-}
-
-function carregarJson(caminho, padrao) {
-  if (!fs.existsSync(caminho)) return padrao;
-
-  const conteudo = fs.readFileSync(caminho, "utf8");
-  if (!conteudo.trim()) return padrao;
-
-  return JSON.parse(conteudo);
-}
-
-function salvarJson(caminho, dados) {
-  garantirPasta(path.dirname(caminho));
-  fs.writeFileSync(caminho, JSON.stringify(dados, null, 2), "utf8");
 }
 
 async function initDb() {

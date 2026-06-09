@@ -5,12 +5,7 @@ const {
   ARQUIVO_APP_LOG,
   ARQUIVO_ERROR_LOG,
 } = require("./paths");
-
-function garantirPasta(caminho) {
-  if (!fs.existsSync(caminho)) {
-    fs.mkdirSync(caminho, { recursive: true });
-  }
-}
+const { garantirPasta } = require("./jsonStore");
 
 function dataAtual() {
   return new Date().toISOString().split("T")[0];
