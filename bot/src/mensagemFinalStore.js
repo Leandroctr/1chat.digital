@@ -29,7 +29,7 @@ function criarMensagemFinalStore({
 
   async function registrarMensagemFinalEnviada(numero) {
     if (USAR_POSTGRES) {
-      await pool.query(
+      const { rowCount } = await pool.query(
         `INSERT INTO final_message_log
           (numero, sent_date)
          VALUES
@@ -39,12 +39,18 @@ function criarMensagemFinalStore({
         [numero]
       );
 
-      return;
+      return rowCount > 0;
     }
 
     const log = carregarJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
+
+    if (log[numero] === dataAtual()) {
+      return false;
+    }
+
     log[numero] = dataAtual();
     salvarJson(ARQUIVO_FINAL_MESSAGE_LOG, log);
+    return true;
   }
 
   async function removerMensagemFinalPendente(numero) {
