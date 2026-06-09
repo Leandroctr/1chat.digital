@@ -53,6 +53,7 @@ const {
 } = require("./src/textUtils");
 const { criarDb } = require("./src/db");
 const { criarHumanoService } = require("./src/humano");
+const { criarMetricsService } = require("./src/metrics");
 const { registrarAdminRoutes } = require("./src/adminRoutes");
 const { registrarWebhookRoute } = require("./src/webhookRoute");
 const { configurarMiddlewares } = require("./src/appMiddleware");
@@ -195,10 +196,21 @@ const { initDb } = criarDb({
   USAR_POSTGRES,
   pool,
 });
+const {
+  obterMetricasHoje,
+  registrarEventoEncaminhamentoHumano,
+} = criarMetricsService({
+  USAR_POSTGRES,
+  pool,
+  obterOuCriarAtendimento,
+  escreverLog,
+  logError,
+});
 const { encaminharParaHumano } = criarHumanoService({
   ativarModoHumano,
   adicionarNaFila,
   estaEmModoHumano,
+  registrarEventoEncaminhamentoHumano,
   enviarMensagem,
   escreverLog,
 });
@@ -217,6 +229,7 @@ registrarAdminRoutes({
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
+  obterMetricasHoje,
   ADMIN_PASSWORD,
   ADMIN_USER,
   escreverLog,

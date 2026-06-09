@@ -55,6 +55,45 @@ function criarDb({ USAR_POSTGRES, pool }) {
         criado_em TIMESTAMPTZ DEFAULT NOW()
       );
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS known_sites (
+        id SERIAL PRIMARY KEY,
+        nome TEXT NOT NULL UNIQUE,
+        aliases TEXT[] DEFAULT '{}',
+        ativo BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS human_handoff_events (
+        id SERIAL PRIMARY KEY,
+        numero TEXT NOT NULL,
+        nome TEXT,
+        site_informado TEXT,
+        site_identificado TEXT,
+        motivo_detectado TEXT,
+        origem TEXT,
+        mensagem TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_handoff_created_at
+      ON human_handoff_events(created_at);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_handoff_site
+      ON human_handoff_events(site_identificado);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_handoff_motivo
+      ON human_handoff_events(motivo_detectado);
+    `);
   }
 
   return {

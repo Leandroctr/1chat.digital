@@ -24,6 +24,7 @@ function registrarAdminRoutes({
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
+  obterMetricasHoje,
   ADMIN_PASSWORD,
   ADMIN_USER,
   escreverLog,
@@ -115,6 +116,10 @@ function registrarAdminRoutes({
 
   app.get("/api/config", autenticarAdmin, async (req, res) => {
     res.json(await carregarConfig());
+  });
+
+  app.get("/api/metrics/today", autenticarAdmin, async (req, res) => {
+    res.json(await obterMetricasHoje());
   });
 
   app.post("/api/config", autenticarAdmin, async (req, res) => {

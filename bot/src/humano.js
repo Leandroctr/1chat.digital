@@ -5,6 +5,7 @@ function criarHumanoService({
   ativarModoHumano,
   adicionarNaFila,
   estaEmModoHumano,
+  registrarEventoEncaminhamentoHumano,
   enviarMensagem,
   escreverLog,
 }) {
@@ -16,6 +17,11 @@ function criarHumanoService({
 
     await ativarModoHumano(numero);
     await adicionarNaFila(numero, mensagemTexto);
+    await registrarEventoEncaminhamentoHumano({
+      numero,
+      mensagemTexto,
+      origem: "pedido_usuario",
+    });
     await enviarMensagem(numero, MENSAGEM_ENCAMINHAMENTO_HUMANO);
     escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
   }
