@@ -53,6 +53,7 @@ const {
   primeiroNome,
 } = require("./src/textUtils");
 const { criarDb } = require("./src/db");
+const { criarHumanoService } = require("./src/humano");
 
 const app = express();
 
@@ -223,12 +224,11 @@ const { initDb } = criarDb({
   USAR_POSTGRES,
   pool,
 });
-
-async function encaminharParaHumano(numero, mensagemTexto) {
-  await ativarModoHumano(numero);
-  await adicionarNaFila(numero, mensagemTexto);
-  escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
-}
+const { encaminharParaHumano } = criarHumanoService({
+  ativarModoHumano,
+  adicionarNaFila,
+  escreverLog,
+});
 
 app.get("/health", (req, res) => {
   res.status(200).json({
