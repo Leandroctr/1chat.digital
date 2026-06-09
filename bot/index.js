@@ -34,6 +34,10 @@ const {
   PERGUNTA_VIDEO,
   criarRespostasService,
 } = require("./src/respostas");
+const {
+  CONFIG_PADRAO,
+  criarConfigService,
+} = require("./src/configService");
 
 const app = express();
 
@@ -105,17 +109,6 @@ const {
 const mensagensProcessadas = new Set();
 const timersMensagemFinal = new Map();
 
-const CONFIG_PADRAO = {
-  mensagem_final_ativa: false,
-  mensagem_final: "",
-  delay_mensagem_final_segundos: 20,
-  pergunta_confirmacao_final: "Posso te ajudar com algo mais?",
-  final_message_image_url: "",
-  final_message_image_path: "",
-  final_message_image_mime: "",
-  final_message_image_size: 0,
-};
-
 const MIME_IMAGENS_MENSAGEM_FINAL = new Set([
   "image/jpeg",
   "image/png",
@@ -182,6 +175,17 @@ const { buscarResposta } = criarRespostasService({
   ARQUIVO_RESPOSTAS,
   escreverLog,
   normalizarTexto,
+});
+const {
+  carregarConfig,
+  salvarConfig,
+  salvarConfigImagem,
+} = criarConfigService({
+  USAR_POSTGRES,
+  pool,
+  ARQUIVO_CONFIG,
+  carregarJson,
+  salvarJson,
 });
 
 async function initDb() {
@@ -551,109 +555,6 @@ async function removerDaFila(numero) {
 
   const fila = await carregarFila();
   await salvarFila(fila.filter((item) => item.numero !== numero));
-}
-
-function normalizarConfig(config) {
-  const delayInformado = Number(config?.delay_mensagem_final_segundos);
-  const tamanhoImagem = Number(config?.final_message_image_size);
-
-  return {
-    ...CONFIG_PADRAO,
-    ...config,
-    mensagem_final_ativa: Boolean(config?.mensagem_final_ativa),
-    mensagem_final: String(config?.mensagem_final || ""),
-    pergunta_confirmacao_final: String(
-      config?.pergunta_confirmacao_final || CONFIG_PADRAO.pergunta_confirmacao_final
-    ),
-    delay_mensagem_final_segundos: Math.max(
-      0,
-      Number.isNaN(delayInformado) ? CONFIG_PADRAO.delay_mensagem_final_segundos : delayInformado
-    ),
-    final_message_image_url: String(config?.final_message_image_url || ""),
-    final_message_image_path: String(config?.final_message_image_path || ""),
-    final_message_image_mime: String(config?.final_message_image_mime || ""),
-    final_message_image_size: Number.isNaN(tamanhoImagem) ? 0 : tamanhoImagem,
-  };
-}
-
-async function carregarConfig() {
-  if (USAR_POSTGRES) {
-    const { rows } = await pool.query(
-      "SELECT valor FROM bot_config WHERE chave = 'global' LIMIT 1"
-    );
-
-    if (!rows.length) {
-      return normalizarConfig(CONFIG_PADRAO);
-    }
-
-    return normalizarConfig(rows[0].valor);
-  }
-
-  return normalizarConfig(carregarJson(ARQUIVO_CONFIG, CONFIG_PADRAO));
-}
-
-async function salvarConfig(config) {
-  const configAtual = await carregarConfig();
-  const configPermitida = {};
-  const camposPermitidos = [
-    "mensagem_final_ativa",
-    "mensagem_final",
-    "delay_mensagem_final_segundos",
-    "pergunta_confirmacao_final",
-  ];
-
-  for (const campo of camposPermitidos) {
-    if (Object.prototype.hasOwnProperty.call(config, campo)) {
-      configPermitida[campo] = config[campo];
-    }
-  }
-
-  const novaConfig = normalizarConfig({ ...configAtual, ...configPermitida });
-
-  if (USAR_POSTGRES) {
-    await pool.query(
-      `INSERT INTO bot_config
-        (chave, valor, atualizado_em)
-       VALUES
-        ('global', $1, NOW())
-       ON CONFLICT (chave)
-       DO UPDATE SET
-        valor = EXCLUDED.valor,
-        atualizado_em = NOW()`,
-      [JSON.stringify(novaConfig)]
-    );
-
-    return novaConfig;
-  }
-
-  salvarJson(ARQUIVO_CONFIG, novaConfig);
-  return novaConfig;
-}
-
-async function salvarConfigImagem(camposImagem) {
-  const novaConfig = normalizarConfig({
-    ...(await carregarConfig()),
-    ...camposImagem,
-  });
-
-  if (USAR_POSTGRES) {
-    await pool.query(
-      `INSERT INTO bot_config
-        (chave, valor, atualizado_em)
-       VALUES
-        ('global', $1, NOW())
-       ON CONFLICT (chave)
-       DO UPDATE SET
-        valor = EXCLUDED.valor,
-        atualizado_em = NOW()`,
-      [JSON.stringify(novaConfig)]
-    );
-
-    return novaConfig;
-  }
-
-  salvarJson(ARQUIVO_CONFIG, novaConfig);
-  return novaConfig;
 }
 
 async function podeEnviarMensagemFinal(numero) {
