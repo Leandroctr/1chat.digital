@@ -38,6 +38,7 @@ const {
 const { criarSupabaseStorage } = require("./src/supabaseStorage");
 const { criarAtendimentosService } = require("./src/atendimentos");
 const { criarFilaService } = require("./src/fila");
+const { criarMensagemFinalStore } = require("./src/mensagemFinalStore");
 
 const app = express();
 
@@ -132,10 +133,6 @@ function primeiroNome(nome) {
   return String(nome || "").trim().split(/\s+/)[0] || "";
 }
 
-function dataAtual() {
-  return new Date().toISOString().split("T")[0];
-}
-
 function horarioAtual() {
   return new Date().toLocaleString("pt-BR");
 }
@@ -197,6 +194,19 @@ const {
   horarioAtual,
   obterOuCriarAtendimento,
 });
+const {
+  buscarMensagensFinaisPendentes,
+  podeEnviarMensagemFinal,
+  registrarMensagemFinalEnviada,
+  removerMensagemFinalPendente,
+  salvarMensagemFinalPendente,
+} = criarMensagemFinalStore({
+  USAR_POSTGRES,
+  pool,
+  ARQUIVO_FINAL_MESSAGE_LOG,
+  carregarJson,
+  salvarJson,
+});
 
 async function initDb() {
   if (!USAR_POSTGRES) return;
@@ -256,44 +266,6 @@ async function initDb() {
   `);
 }
 
-async function podeEnviarMensagemFinal(numero) {
-  if (USAR_POSTGRES) {
-    const { rows } = await pool.query(
-      `SELECT 1
-       FROM final_message_log
-       WHERE numero = $1
-         AND sent_date = CURRENT_DATE
-       LIMIT 1`,
-      [numero]
-    );
-
-    return rows.length === 0;
-  }
-
-  const log = carregarJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
-  return log[numero] !== dataAtual();
-}
-
-async function registrarMensagemFinalEnviada(numero) {
-  if (USAR_POSTGRES) {
-    await pool.query(
-      `INSERT INTO final_message_log
-        (numero, sent_date)
-       VALUES
-        ($1, CURRENT_DATE)
-       ON CONFLICT (numero, sent_date)
-       DO NOTHING`,
-      [numero]
-    );
-
-    return;
-  }
-
-  const log = carregarJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
-  log[numero] = dataAtual();
-  salvarJson(ARQUIVO_FINAL_MESSAGE_LOG, log);
-}
-
 async function enviarMensagemFinal(numero) {
   const config = await carregarConfig();
 
@@ -344,29 +316,6 @@ function cancelarTimerMensagemFinal(numero) {
     clearTimeout(timer);
     timersMensagemFinal.delete(numero);
   }
-}
-
-async function removerMensagemFinalPendente(numero) {
-  if (!USAR_POSTGRES) return;
-
-  await pool.query("DELETE FROM final_message_pending WHERE numero = $1", [numero]);
-}
-
-async function salvarMensagemFinalPendente(numero, origem, delaySegundos) {
-  if (!USAR_POSTGRES) return;
-
-  await pool.query(
-    `INSERT INTO final_message_pending
-      (numero, origem, scheduled_at)
-     VALUES
-      ($1, $2, NOW() + ($3 * INTERVAL '1 second'))
-     ON CONFLICT (numero)
-     DO UPDATE SET
-      origem = EXCLUDED.origem,
-      scheduled_at = EXCLUDED.scheduled_at,
-      criado_em = NOW()`,
-    [numero, origem, delaySegundos]
-  );
 }
 
 async function cancelarTimerMensagemFinalPersistente(numero) {
@@ -452,15 +401,9 @@ async function verificarMensagensFinaisPendentes() {
   verificandoMensagensFinaisPendentes = true;
 
   try {
-    const { rows } = await pool.query(
-      `SELECT numero, origem
-       FROM final_message_pending
-       WHERE scheduled_at <= NOW()
-       ORDER BY scheduled_at ASC
-       LIMIT 20`
-    );
+    const pendentes = await buscarMensagensFinaisPendentes();
 
-    for (const item of rows) {
+    for (const item of pendentes) {
       try {
         cancelarTimerMensagemFinal(item.numero);
         await enviarMensagemFinal(item.numero);
