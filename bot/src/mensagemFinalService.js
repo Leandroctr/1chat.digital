@@ -35,7 +35,9 @@ function criarMensagemFinalService({
       return false;
     }
 
-    if (!(await podeEnviarMensagemFinal(numero))) {
+    const registrouEnvio = await registrarMensagemFinalEnviada(numero);
+
+    if (!registrouEnvio) {
       escreverLog(`MENSAGEM FINAL JÁ ENVIADA HOJE | ${numero}`);
       return false;
     }
@@ -65,7 +67,6 @@ function criarMensagemFinalService({
       return false;
     }
 
-    await registrarMensagemFinalEnviada(numero);
     escreverLog(`MENSAGEM FINAL ENVIADA | ${numero}`);
     return true;
   }
