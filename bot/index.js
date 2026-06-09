@@ -56,6 +56,16 @@ const { criarHumanoService } = require("./src/humano");
 const { registrarAdminRoutes } = require("./src/adminRoutes");
 const { registrarWebhookRoute } = require("./src/webhookRoute");
 const { configurarMiddlewares } = require("./src/appMiddleware");
+const {
+  PORT,
+  SESSION,
+  SUPABASE_BUCKET,
+  SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_URL,
+  USAR_POSTGRES,
+  WAHA_API_KEY,
+  WAHA_URL,
+} = require("./src/env");
 
 const app = express();
 
@@ -64,15 +74,6 @@ configurarMiddlewares({
   publicDir: path.join(__dirname, "public"),
   logWarn,
 });
-
-const PORT = process.env.PORT || 3000;
-const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://localhost:3001";
-const WAHA_API_KEY = process.env.WAHA_API_KEY || "123456";
-const SESSION = process.env.WAHA_SESSION || "default";
-const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "finalmessageassets";
 
 const pool = USAR_POSTGRES
   ? new Pool({ connectionString: process.env.DATABASE_URL })
