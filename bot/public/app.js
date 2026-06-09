@@ -340,6 +340,61 @@ async function carregarMetricas() {
   }
 }
 
+function mostrarStatusResetOperacional(texto, tipo = "info") {
+  const status = document.getElementById("resetOperacionalStatus");
+
+  if (!status) return;
+
+  status.textContent = texto;
+  status.className = `status-message ${tipo}`;
+}
+
+async function resetOperacional() {
+  const confirmar = confirm(
+    "Essa ação vai limpar fila, atendimentos ativos, mensagens finais enviadas, timers pendentes e métricas do dia. Não apaga sites cadastrados nem configurações. Deseja continuar?"
+  );
+
+  if (!confirmar) return;
+
+  const password = prompt("Digite sua senha de admin para confirmar");
+
+  if (!password) {
+    mostrarStatusResetOperacional("Reset cancelado.", "error");
+    return;
+  }
+
+  try {
+    mostrarStatusResetOperacional("Executando reset operacional...");
+
+    const response = await fetchAdmin(
+      `${API_BASE_URL}/api/admin/reset-operacional`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      }
+    );
+
+    if (!response.ok) {
+      const erro = await response.json().catch(() => ({}));
+      throw new Error(
+        erro.erro || "Nao foi possivel executar o reset operacional."
+      );
+    }
+
+    mostrarStatusResetOperacional(
+      "Reset operacional executado com sucesso.",
+      "success"
+    );
+    await carregarFila();
+    await carregarMetricas();
+  } catch (error) {
+    mostrarStatusResetOperacional(error.message, "error");
+  }
+}
+
 async function encerrarAtendimento(numero) {
   const confirmar = confirm(
     "Encerrar este atendimento? O bot perguntará se o cliente precisa de algo mais antes de finalizar."

@@ -254,6 +254,26 @@
             </div>
           </section>
         </section>
+
+        <section class="panel admin-tools-panel">
+          <div class="panel-header">
+            <div>
+              <h3>Ferramentas administrativas</h3>
+              <p>Ações operacionais para uso controlado durante o MVP.</p>
+            </div>
+          </div>
+
+          <div class="admin-tools">
+            <div>
+              <strong>Reset operacional</strong>
+              <span>Limpa fila, atendimentos ativos, controles temporários e métricas.</span>
+            </div>
+            <button class="danger" type="button" onclick="resetOperacional()">
+              Reset operacional
+            </button>
+            <span id="resetOperacionalStatus" class="status-message"></span>
+          </div>
+        </section>
       </section>
     </main>
   </div>

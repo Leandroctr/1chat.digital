@@ -244,6 +244,29 @@ body {
   gap: 18px;
 }
 
+.admin-tools-panel {
+  margin-top: 18px;
+}
+
+.admin-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 22px 26px;
+}
+
+.admin-tools strong,
+.admin-tools span {
+  display: block;
+}
+
+.admin-tools div span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .green {
   color: var(--green);
 }
@@ -489,6 +512,11 @@ td {
   .metrics-summary,
   .metrics-tables {
     grid-template-columns: 1fr;
+  }
+
+  .admin-tools {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .config-grid {

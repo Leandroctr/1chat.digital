@@ -217,6 +217,8 @@ const { encaminharParaHumano } = criarHumanoService({
 
 registrarAdminRoutes({
   app,
+  USAR_POSTGRES,
+  pool,
   publicDir: path.join(__dirname, "public"),
   carregarFila,
   carregarConfig,

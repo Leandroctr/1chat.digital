@@ -12,6 +12,8 @@ function valoresIguais(valorA = "", valorB = "") {
 
 function registrarAdminRoutes({
   app,
+  USAR_POSTGRES,
+  pool,
   publicDir,
   carregarFila,
   carregarConfig,
@@ -120,6 +122,48 @@ function registrarAdminRoutes({
 
   app.get("/api/metrics/today", autenticarAdmin, async (req, res) => {
     res.json(await obterMetricasHoje());
+  });
+
+  app.post("/api/admin/reset-operacional", autenticarAdmin, async (req, res) => {
+    escreverLog("ADMIN RESET OPERACIONAL SOLICITADO");
+
+    if (!ADMIN_PASSWORD) {
+      escreverLog(
+        "ADMIN RESET OPERACIONAL ERRO | ADMIN_PASSWORD nao configurado"
+      );
+      return res.status(500).json({
+        erro: "Senha admin nao configurada. Configure ADMIN_PASSWORD.",
+      });
+    }
+
+    if (!valoresIguais(req.body?.password || "", ADMIN_PASSWORD)) {
+      escreverLog("ADMIN RESET OPERACIONAL SENHA INVALIDA");
+      return res.status(401).json({ erro: "Senha admin invalida." });
+    }
+
+    if (!USAR_POSTGRES) {
+      escreverLog("ADMIN RESET OPERACIONAL ERRO | PostgreSQL nao configurado");
+      return res.status(500).json({
+        erro: "Reset operacional disponivel apenas com PostgreSQL.",
+      });
+    }
+
+    try {
+      await pool.query(`
+        TRUNCATE fila, atendimentos, final_message_log,
+          final_message_pending, human_handoff_events
+        RESTART IDENTITY
+      `);
+
+      escreverLog("ADMIN RESET OPERACIONAL EXECUTADO");
+      return res.json({ ok: true });
+    } catch (error) {
+      escreverLog(`ADMIN RESET OPERACIONAL ERRO | ${error.message}`);
+      logError("ADMIN", "Erro no reset operacional", error);
+      return res.status(500).json({
+        erro: "Nao foi possivel executar o reset operacional.",
+      });
+    }
   });
 
   app.post("/api/config", autenticarAdmin, async (req, res) => {
