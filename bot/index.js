@@ -155,6 +155,10 @@ function normalizarTexto(texto) {
     .trim();
 }
 
+function primeiroNome(nome) {
+  return String(nome || "").trim().split(/\s+/)[0] || "";
+}
+
 function dataAtual() {
   return new Date().toISOString().split("T")[0];
 }
@@ -353,6 +357,23 @@ async function initDb() {
       sent_date DATE NOT NULL DEFAULT CURRENT_DATE,
       sent_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(numero, sent_date)
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bot_config (
+      chave TEXT PRIMARY KEY,
+      valor JSONB NOT NULL,
+      atualizado_em TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS final_message_pending (
+      numero TEXT PRIMARY KEY,
+      origem TEXT,
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      criado_em TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 }
@@ -795,12 +816,24 @@ function normalizarConfig(config) {
   };
 }
 
-function carregarConfig() {
+async function carregarConfig() {
+  if (USAR_POSTGRES) {
+    const { rows } = await pool.query(
+      "SELECT valor FROM bot_config WHERE chave = 'global' LIMIT 1"
+    );
+
+    if (!rows.length) {
+      return normalizarConfig(CONFIG_PADRAO);
+    }
+
+    return normalizarConfig(rows[0].valor);
+  }
+
   return normalizarConfig(carregarJson(ARQUIVO_CONFIG, CONFIG_PADRAO));
 }
 
-function salvarConfig(config) {
-  const configAtual = carregarConfig();
+async function salvarConfig(config) {
+  const configAtual = await carregarConfig();
   const configPermitida = {};
   const camposPermitidos = [
     "mensagem_final_ativa",
@@ -816,15 +849,48 @@ function salvarConfig(config) {
   }
 
   const novaConfig = normalizarConfig({ ...configAtual, ...configPermitida });
+
+  if (USAR_POSTGRES) {
+    await pool.query(
+      `INSERT INTO bot_config
+        (chave, valor, atualizado_em)
+       VALUES
+        ('global', $1, NOW())
+       ON CONFLICT (chave)
+       DO UPDATE SET
+        valor = EXCLUDED.valor,
+        atualizado_em = NOW()`,
+      [JSON.stringify(novaConfig)]
+    );
+
+    return novaConfig;
+  }
+
   salvarJson(ARQUIVO_CONFIG, novaConfig);
   return novaConfig;
 }
 
-function salvarConfigImagem(camposImagem) {
+async function salvarConfigImagem(camposImagem) {
   const novaConfig = normalizarConfig({
-    ...carregarConfig(),
+    ...(await carregarConfig()),
     ...camposImagem,
   });
+
+  if (USAR_POSTGRES) {
+    await pool.query(
+      `INSERT INTO bot_config
+        (chave, valor, atualizado_em)
+       VALUES
+        ('global', $1, NOW())
+       ON CONFLICT (chave)
+       DO UPDATE SET
+        valor = EXCLUDED.valor,
+        atualizado_em = NOW()`,
+      [JSON.stringify(novaConfig)]
+    );
+
+    return novaConfig;
+  }
 
   salvarJson(ARQUIVO_CONFIG, novaConfig);
   return novaConfig;
@@ -869,7 +935,7 @@ async function registrarMensagemFinalEnviada(numero) {
 }
 
 async function enviarMensagemFinal(numero) {
-  const config = carregarConfig();
+  const config = await carregarConfig();
 
   if (
     !config.mensagem_final_ativa ||
@@ -920,13 +986,47 @@ function cancelarTimerMensagemFinal(numero) {
   }
 }
 
-async function iniciarPerguntaFinal(numero, origem) {
+async function removerMensagemFinalPendente(numero) {
+  if (!USAR_POSTGRES) return;
+
+  await pool.query("DELETE FROM final_message_pending WHERE numero = $1", [numero]);
+}
+
+async function salvarMensagemFinalPendente(numero, origem, delaySegundos) {
+  if (!USAR_POSTGRES) return;
+
+  await pool.query(
+    `INSERT INTO final_message_pending
+      (numero, origem, scheduled_at)
+     VALUES
+      ($1, $2, NOW() + ($3 * INTERVAL '1 second'))
+     ON CONFLICT (numero)
+     DO UPDATE SET
+      origem = EXCLUDED.origem,
+      scheduled_at = EXCLUDED.scheduled_at,
+      criado_em = NOW()`,
+    [numero, origem, delaySegundos]
+  );
+}
+
+async function cancelarTimerMensagemFinalPersistente(numero) {
   cancelarTimerMensagemFinal(numero);
+  await removerMensagemFinalPendente(numero);
+}
 
-  const config = carregarConfig();
+async function iniciarPerguntaFinal(numero, origem) {
+  await cancelarTimerMensagemFinalPersistente(numero);
 
-  await enviarMensagem(numero, config.pergunta_confirmacao_final);
+  const config = await carregarConfig();
+  const atendimento = await obterOuCriarAtendimento(numero);
+  const nome = primeiroNome(atendimento.nome);
+  const pergunta = nome
+    ? `${nome}, ${config.pergunta_confirmacao_final.charAt(0).toLowerCase()}${config.pergunta_confirmacao_final.slice(1)}`
+    : config.pergunta_confirmacao_final;
+
+  await enviarMensagem(numero, pergunta);
   escreverLog(`FINAL PERGUNTA ENVIADA | ${numero} | ${origem}`);
+  await salvarMensagemFinalPendente(numero, origem, config.delay_mensagem_final_segundos);
 
   const timer = setTimeout(async () => {
     timersMensagemFinal.delete(numero);
@@ -934,6 +1034,7 @@ async function iniciarPerguntaFinal(numero, origem) {
     try {
       await enviarMensagemFinal(numero);
       await limparAtendimento(numero);
+      await removerMensagemFinalPendente(numero);
       escreverLog(`FINAL AUTOMATICO | ${numero} | ${origem}`);
     } catch (error) {
       escreverLog(`ERRO FINAL AUTOMATICO | ${numero} | ${origem} | ${error.message}`);
@@ -966,7 +1067,7 @@ async function iniciarFluxoPosResposta(numero) {
     return;
   }
 
-  const config = carregarConfig();
+  const config = await carregarConfig();
 
   if (
     !config.mensagem_final_ativa ||
@@ -981,6 +1082,47 @@ async function iniciarFluxoPosResposta(numero) {
     etapa: "aguardando_confirmacao_pos_resposta",
   });
   await iniciarPerguntaFinal(numero, "pos_resposta");
+}
+
+let verificandoMensagensFinaisPendentes = false;
+
+async function verificarMensagensFinaisPendentes() {
+  if (!USAR_POSTGRES || verificandoMensagensFinaisPendentes) return;
+
+  verificandoMensagensFinaisPendentes = true;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT numero, origem
+       FROM final_message_pending
+       WHERE scheduled_at <= NOW()
+       ORDER BY scheduled_at ASC
+       LIMIT 20`
+    );
+
+    for (const item of rows) {
+      try {
+        cancelarTimerMensagemFinal(item.numero);
+        await enviarMensagemFinal(item.numero);
+        await limparAtendimento(item.numero);
+        await removerMensagemFinalPendente(item.numero);
+        escreverLog(`FINAL AUTOMATICO PERSISTENTE | ${item.numero} | ${item.origem || "sem_origem"}`);
+      } catch (error) {
+        escreverLog(`ERRO FINAL AUTOMATICO PERSISTENTE | ${item.numero} | ${error.message}`);
+      }
+    }
+  } catch (error) {
+    escreverLog(`ERRO VERIFICAR FINAL PENDENTE | ${error.message}`);
+  } finally {
+    verificandoMensagensFinaisPendentes = false;
+  }
+}
+
+function iniciarVerificadorMensagensFinaisPendentes() {
+  if (!USAR_POSTGRES) return;
+
+  setInterval(verificarMensagensFinaisPendentes, 5000);
+  verificarMensagensFinaisPendentes();
 }
 
 function usuarioConfirmouEncerramento(mensagemNormalizada) {
@@ -1052,12 +1194,12 @@ app.get("/api/fila", async (req, res) => {
   res.json(fila);
 });
 
-app.get("/api/config", (req, res) => {
-  res.json(carregarConfig());
+app.get("/api/config", async (req, res) => {
+  res.json(await carregarConfig());
 });
 
-app.post("/api/config", (req, res) => {
-  const config = salvarConfig(req.body || {});
+app.post("/api/config", async (req, res) => {
+  const config = await salvarConfig(req.body || {});
   res.json(config);
 });
 
@@ -1076,7 +1218,7 @@ app.post(
 
       const extensao = EXTENSAO_POR_MIME[req.file.mimetype];
       const filePath = `final-message-${Date.now()}.${extensao}`;
-      const configAtual = carregarConfig();
+      const configAtual = await carregarConfig();
       const imagemAntigaPath = configAtual.final_message_image_path;
 
       logInfo("SUPABASE", "Upload imagem final iniciado", {
@@ -1120,7 +1262,7 @@ app.post(
         .from(SUPABASE_BUCKET)
         .getPublicUrl(filePath);
 
-      const config = salvarConfigImagem({
+      const config = await salvarConfigImagem({
         final_message_image_url: data.publicUrl,
         final_message_image_path: filePath,
         final_message_image_mime: req.file.mimetype,
@@ -1140,7 +1282,7 @@ app.post(
 
 app.delete("/api/config/final-message-image", async (req, res) => {
   try {
-    const configAtual = carregarConfig();
+    const configAtual = await carregarConfig();
 
     if (supabase && configAtual.final_message_image_path) {
       await supabase.storage
@@ -1148,7 +1290,7 @@ app.delete("/api/config/final-message-image", async (req, res) => {
         .remove([configAtual.final_message_image_path]);
     }
 
-    const config = salvarConfigImagem({
+    const config = await salvarConfigImagem({
       final_message_image_url: "",
       final_message_image_path: "",
       final_message_image_mime: "",
@@ -1215,7 +1357,7 @@ app.post("/webhook", async (req, res) => {
     const atendimento = await obterOuCriarAtendimento(numero);
 
     if (atendimento.etapa === "aguardando_confirmacao_final") {
-      cancelarTimerMensagemFinal(numero);
+      await cancelarTimerMensagemFinalPersistente(numero);
 
       if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
         escreverLog(`CONFIRMACAO FINAL | ${numero}`);
@@ -1255,7 +1397,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (atendimento.etapa === "aguardando_confirmacao_pos_resposta") {
-      cancelarTimerMensagemFinal(numero);
+      await cancelarTimerMensagemFinalPersistente(numero);
 
       if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
         escreverLog(`CONFIRMACAO FINAL | ${numero}`);
@@ -1289,12 +1431,17 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (atendimento.etapa === "aguardando_nome") {
+      const nomeCliente = primeiroNome(mensagemTexto);
+
       await atualizarAtendimento(numero, {
         nome: mensagemTexto,
         etapa: "aguardando_cpf",
       });
 
-      await enviarMensagem(numero, "Obrigado. Agora informe seu CPF.");
+      await enviarMensagem(
+        numero,
+        nomeCliente ? `Obrigado, ${nomeCliente}. Agora informe seu CPF.` : "Obrigado. Agora informe seu CPF."
+      );
       escreverLog(`NOME SALVO | ${numero} | ${mensagemTexto}`);
       return res.sendStatus(200);
     }
@@ -1332,7 +1479,12 @@ app.post("/webhook", async (req, res) => {
         etapa: "liberado",
       });
 
-      await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
+      await enviarMensagem(
+        numero,
+        atendimento.nome
+          ? `Perfeito, ${primeiroNome(atendimento.nome)}. Agora me diga como posso ajudar.`
+          : "Perfeito. Agora me diga como posso ajudar."
+      );
       escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
       return res.sendStatus(200);
     }
@@ -1418,6 +1570,7 @@ app.post("/webhook", async (req, res) => {
 async function start() {
   rotacionarLogsNoStartup();
   await initDb();
+  iniciarVerificadorMensagensFinaisPendentes();
 
   app.listen(PORT, () => {
     console.log("=================================");
