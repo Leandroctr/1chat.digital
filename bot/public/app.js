@@ -14,6 +14,25 @@ const API_BASE_URL =
   window.API_BASE_URL ||
   localStorage.getItem("API_BASE_URL") ||
   "";
+let respostasCache = [];
+
+function escaparHtml(valor) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function linkSeguro(valor) {
+  try {
+    const url = new URL(String(valor || ""));
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch (error) {
+    return "";
+  }
+}
 
 function definirCarregamento(botao, carregando) {
   if (!botao) return;
@@ -71,6 +90,7 @@ function mostrarSecao(secao) {
     atendimentos: document.getElementById("sectionAtendimentos"),
     mensagemFinal: document.getElementById("sectionMensagemFinal"),
     metricas: document.getElementById("sectionMetricas"),
+    respostas: document.getElementById("sectionRespostas"),
   };
 
   Object.entries(secoes).forEach(([nome, elemento]) => {
@@ -85,6 +105,10 @@ function mostrarSecao(secao) {
 
   if (secao === "metricas") {
     carregarMetricas();
+  }
+
+  if (secao === "respostas") {
+    carregarRespostas();
   }
 }
 
@@ -428,6 +452,157 @@ async function carregarMetricas(botao) {
     mostrarToast("Métricas indisponíveis", "Não foi possível atualizar os indicadores.", "error");
   } finally {
     definirCarregamento(botao, false);
+  }
+}
+
+function atualizarResumoRespostas() {
+  const total = document.getElementById("respostasTotal");
+  const ativas = document.getElementById("respostasAtivas");
+  if (total) total.textContent = respostasCache.length;
+  if (ativas) {
+    ativas.textContent = respostasCache.filter((item) => item.ativo).length;
+  }
+}
+
+function renderizarRespostas(itens) {
+  const tbody = document.getElementById("respostasBody");
+  if (!tbody) return;
+
+  if (!itens.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Nenhuma resposta encontrada.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = itens.map((item) => {
+    const video = linkSeguro(item.video);
+    return `
+    <tr>
+      <td><div class="response-question"><strong>${escaparHtml(item.pergunta)}</strong><span>${escaparHtml(item.categoria || "Sem categoria")}</span></div></td>
+      <td><div class="response-copy">${escaparHtml(item.resposta)}</div></td>
+      <td>${video ? `<a class="video-link" href="${escaparHtml(video)}" target="_blank" rel="noopener">Abrir</a>` : "-"}</td>
+      <td><span class="boolean-status ${item.ativo ? "active" : ""}">${item.ativo ? "Ativo" : "Inativo"}</span></td>
+      <td><div class="response-actions"><button class="icon-button" type="button" onclick="abrirEditorResposta(${item.id})">Editar</button><button class="icon-button remove" type="button" onclick="excluirResposta(${item.id})">Remover</button></div></td>
+    </tr>`;
+  }).join("");
+}
+
+function filtrarRespostas() {
+  const termo = normalizarBusca(
+    document.getElementById("respostasBusca")?.value || ""
+  );
+  const filtradas = termo
+    ? respostasCache.filter((item) => normalizarBusca(
+        `${item.pergunta} ${item.resposta} ${item.categoria} ${item.sinonimos}`
+      ).includes(termo))
+    : respostasCache;
+  renderizarRespostas(filtradas);
+}
+
+function normalizarBusca(valor) {
+  return String(valor || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+async function carregarRespostas(botao) {
+  const tbody = document.getElementById("respostasBody");
+  try {
+    definirCarregamento(botao, true);
+    mostrarCarregamentoTabela(tbody, 5, "Carregando base...");
+    const response = await fetchAdmin(`${API_BASE_URL}/api/respostas`);
+    if (!response.ok) throw new Error("Nao foi possivel carregar a base.");
+    respostasCache = await response.json();
+    atualizarResumoRespostas();
+    filtrarRespostas();
+  } catch (error) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="empty">${escaparHtml(error.message)}</td></tr>`;
+    mostrarToast("Base indisponivel", error.message, "error");
+  } finally {
+    definirCarregamento(botao, false);
+  }
+}
+
+function preencherCampo(id, valor) {
+  const campo = document.getElementById(id);
+  if (campo) campo.value = valor ?? "";
+}
+
+function abrirEditorResposta(id) {
+  const item = respostasCache.find((resposta) => resposta.id === Number(id));
+  preencherCampo("respostaId", item?.id || "");
+  preencherCampo("respostaPergunta", item?.pergunta || "");
+  preencherCampo("respostaTexto", item?.resposta || "");
+  preencherCampo("respostaVideo", item?.video || "");
+  preencherCampo("respostaCategoria", item?.categoria || "");
+  preencherCampo("respostaPrioridade", item?.prioridade ?? 0);
+  preencherCampo("respostaSinonimos", item?.sinonimos || "");
+  preencherCampo("respostaObservacao", item?.observacao || "");
+  document.getElementById("respostaAtiva").checked = item?.ativo ?? true;
+  document.getElementById("respostaDialogTitulo").textContent =
+    item ? "Editar resposta" : "Nova resposta";
+  document.getElementById("respostaStatus").textContent = "";
+  document.getElementById("respostaDialog").showModal();
+  setTimeout(() => document.getElementById("respostaPergunta")?.focus(), 50);
+}
+
+function fecharEditorResposta() {
+  document.getElementById("respostaDialog")?.close();
+}
+
+async function salvarResposta(event) {
+  event.preventDefault();
+  const id = document.getElementById("respostaId").value;
+  const botao = document.getElementById("respostaSalvarButton");
+  const dados = {
+    pergunta: document.getElementById("respostaPergunta").value,
+    resposta: document.getElementById("respostaTexto").value,
+    video: document.getElementById("respostaVideo").value,
+    ativo: document.getElementById("respostaAtiva").checked,
+    categoria: document.getElementById("respostaCategoria").value,
+    prioridade: Number(document.getElementById("respostaPrioridade").value),
+    sinonimos: document.getElementById("respostaSinonimos").value,
+    observacao: document.getElementById("respostaObservacao").value,
+  };
+
+  try {
+    definirCarregamento(botao, true);
+    const response = await fetchAdmin(
+      id ? `${API_BASE_URL}/api/respostas/${id}` : `${API_BASE_URL}/api/respostas`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dados),
+      }
+    );
+    const resultado = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(resultado.erro || "Nao foi possivel salvar.");
+    fecharEditorResposta();
+    await carregarRespostas();
+    mostrarToast("Resposta salva", "A base respostas.xlsx foi atualizada.", "success");
+  } catch (error) {
+    const status = document.getElementById("respostaStatus");
+    status.textContent = error.message;
+    status.className = "status-message error";
+  } finally {
+    definirCarregamento(botao, false);
+  }
+}
+
+async function excluirResposta(id) {
+  const item = respostasCache.find((resposta) => resposta.id === Number(id));
+  if (!confirm(`Remover a resposta "${item?.pergunta || id}"?`)) return;
+
+  try {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/respostas/${id}`, {
+      method: "DELETE",
+    });
+    const resultado = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(resultado.erro || "Nao foi possivel remover.");
+    await carregarRespostas();
+    mostrarToast("Resposta removida", "A planilha foi atualizada.", "success");
+  } catch (error) {
+    mostrarToast("Erro ao remover", error.message, "error");
   }
 }
 

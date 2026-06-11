@@ -23,6 +23,10 @@ function registrarAdminRoutes({
   supabaseConfigurado,
   uploadImagemFinal,
   removerImagemFinal,
+  listarRespostas,
+  adicionarResposta,
+  atualizarResposta,
+  removerResposta,
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
@@ -122,6 +126,37 @@ function registrarAdminRoutes({
 
   app.get("/api/metrics/today", autenticarAdmin, async (req, res) => {
     res.json(await obterMetricasHoje());
+  });
+
+  app.get("/api/respostas", autenticarAdmin, (req, res) => {
+    res.json(listarRespostas());
+  });
+
+  app.post("/api/respostas", autenticarAdmin, async (req, res) => {
+    try {
+      return res.status(201).json(await adicionarResposta(req.body || {}));
+    } catch (error) {
+      logError("ADMIN", "Erro ao adicionar resposta", error);
+      return res.status(error.status || 400).json({ erro: error.message });
+    }
+  });
+
+  app.put("/api/respostas/:id", autenticarAdmin, async (req, res) => {
+    try {
+      return res.json(await atualizarResposta(req.params.id, req.body || {}));
+    } catch (error) {
+      logError("ADMIN", "Erro ao atualizar resposta", error);
+      return res.status(error.status || 400).json({ erro: error.message });
+    }
+  });
+
+  app.delete("/api/respostas/:id", autenticarAdmin, async (req, res) => {
+    try {
+      return res.json(await removerResposta(req.params.id));
+    } catch (error) {
+      logError("ADMIN", "Erro ao remover resposta", error);
+      return res.status(error.status || 400).json({ erro: error.message });
+    }
   });
 
   app.post("/api/admin/reset-operacional", autenticarAdmin, async (req, res) => {

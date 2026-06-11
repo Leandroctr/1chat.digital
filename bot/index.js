@@ -110,7 +110,13 @@ garantirArquivoJson(ARQUIVO_FILA, []);
 garantirArquivoJson(ARQUIVO_CONFIG, CONFIG_PADRAO);
 garantirArquivoJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
 
-const { buscarResposta } = criarRespostasService({
+const {
+  adicionarResposta,
+  atualizarResposta,
+  buscarResposta,
+  listarRespostas,
+  removerResposta,
+} = criarRespostasService({
   ARQUIVO_RESPOSTAS,
   escreverLog,
   normalizarTexto,
@@ -229,6 +235,10 @@ registrarAdminRoutes({
   supabaseConfigurado,
   uploadImagemFinal,
   removerImagemFinal,
+  listarRespostas,
+  adicionarResposta,
+  atualizarResposta,
+  removerResposta,
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
