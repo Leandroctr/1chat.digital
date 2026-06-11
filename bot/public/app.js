@@ -15,6 +15,46 @@ const API_BASE_URL =
   localStorage.getItem("API_BASE_URL") ||
   "";
 
+function definirCarregamento(botao, carregando) {
+  if (!botao) return;
+
+  if (carregando) {
+    botao.dataset.textoOriginal = botao.textContent;
+    botao.textContent = botao.dataset.loadingText || "Aguarde...";
+    botao.disabled = true;
+    botao.setAttribute("aria-busy", "true");
+    return;
+  }
+
+  botao.textContent = botao.dataset.textoOriginal || botao.textContent;
+  botao.disabled = false;
+  botao.removeAttribute("aria-busy");
+}
+
+function mostrarToast(titulo, mensagem, tipo = "info") {
+  const region = document.getElementById("toastRegion");
+  if (!region) return;
+
+  const toast = document.createElement("div");
+  const conteudo = document.createElement("div");
+  const tituloElemento = document.createElement("strong");
+  const mensagemElemento = document.createElement("span");
+
+  toast.className = `toast ${tipo}`;
+  tituloElemento.textContent = titulo;
+  mensagemElemento.textContent = mensagem;
+  conteudo.append(tituloElemento, mensagemElemento);
+  toast.append(conteudo);
+  region.append(toast);
+
+  setTimeout(() => toast.remove(), 4200);
+}
+
+function mostrarCarregamentoTabela(tbody, colunas, texto) {
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="${colunas}" class="empty"><span class="spinner"></span>${texto}</td></tr>`;
+}
+
 async function fetchAdmin(url, options) {
   const response = await fetch(url, options);
 
@@ -84,6 +124,24 @@ function atualizarPreviewImagem(config) {
   vazio.hidden = false;
 }
 
+function atualizarPreviewConversa() {
+  const pergunta = document.getElementById("perguntaConfirmacaoFinal")?.value;
+  const mensagem = document.getElementById("mensagemFinal")?.value;
+  const previewPergunta = document.getElementById("previewPergunta");
+  const previewMensagem = document.getElementById("previewMensagem");
+  const contador = document.getElementById("messageCounter");
+
+  if (previewPergunta) {
+    const horario = previewPergunta.querySelector("small")?.outerHTML || "";
+    previewPergunta.innerHTML = `${pergunta || "Te ajudo em algo mais?"}${horario}`;
+  }
+  if (previewMensagem) {
+    previewMensagem.textContent =
+      mensagem || "Obrigado pelo contato. Conte com a nossa equipe!";
+  }
+  if (contador) contador.textContent = `${(mensagem || "").length} caracteres`;
+}
+
 async function carregarConfig() {
   try {
     const response = await fetchAdmin(`${API_BASE_URL}/api/config`);
@@ -99,6 +157,7 @@ async function carregarConfig() {
       config.delay_mensagem_final_segundos ?? 20;
 
     atualizarPreviewImagem(config);
+    atualizarPreviewConversa();
     mostrarStatusConfig("");
     mostrarStatusImagem("");
   } catch (error) {
@@ -111,6 +170,7 @@ async function carregarConfig() {
 
 async function salvarConfig(event) {
   event.preventDefault();
+  const botao = event.submitter;
 
   const config = {
     mensagem_final_ativa:
@@ -124,6 +184,7 @@ async function salvarConfig(event) {
   };
 
   try {
+    definirCarregamento(botao, true);
     const response = await fetchAdmin(`${API_BASE_URL}/api/config`, {
       method: "POST",
       headers: {
@@ -147,17 +208,22 @@ async function salvarConfig(event) {
     document.getElementById("delayMensagemFinal").value =
       configSalva.delay_mensagem_final_segundos ?? 20;
     atualizarPreviewImagem(configSalva);
+    atualizarPreviewConversa();
 
     mostrarStatusConfig("Configuração salva.", "success");
+    mostrarToast("Configuração salva", "As alterações já estão ativas.", "success");
   } catch (error) {
     mostrarStatusConfig(
       "Não foi possível salvar a configuração.",
       "error"
     );
+    mostrarToast("Erro ao salvar", "Revise os dados e tente novamente.", "error");
+  } finally {
+    definirCarregamento(botao, false);
   }
 }
 
-async function enviarImagemMensagemFinal() {
+async function enviarImagemMensagemFinal(botao) {
   const input = document.getElementById("mensagemFinalImage");
 
   if (!input?.files?.length) {
@@ -169,6 +235,7 @@ async function enviarImagemMensagemFinal() {
   formData.append("image", input.files[0]);
 
   try {
+    definirCarregamento(botao, true);
     mostrarStatusImagem("Enviando imagem...");
 
     const response = await fetchAdmin(`${API_BASE_URL}/api/config/final-message-image`, {
@@ -184,13 +251,18 @@ async function enviarImagemMensagemFinal() {
     atualizarPreviewImagem(config);
     input.value = "";
     mostrarStatusImagem("Imagem salva.", "success");
+    mostrarToast("Imagem atualizada", "A imagem da mensagem final foi salva.", "success");
   } catch (error) {
     mostrarStatusImagem("Não foi possível enviar a imagem.", "error");
+    mostrarToast("Falha no envio", "Não foi possível salvar a imagem.", "error");
+  } finally {
+    definirCarregamento(botao, false);
   }
 }
 
-async function removerImagemMensagemFinal() {
+async function removerImagemMensagemFinal(botao) {
   try {
+    definirCarregamento(botao, true);
     mostrarStatusImagem("Removendo imagem...");
 
     const response = await fetchAdmin(`${API_BASE_URL}/api/config/final-message-image`, {
@@ -204,41 +276,53 @@ async function removerImagemMensagemFinal() {
     const config = await response.json();
     atualizarPreviewImagem(config);
     mostrarStatusImagem("Imagem removida.", "success");
+    mostrarToast("Imagem removida", "A mensagem final continuará somente com texto.", "success");
   } catch (error) {
     mostrarStatusImagem("Não foi possível remover a imagem.", "error");
+    mostrarToast("Erro ao remover", "Tente novamente em alguns instantes.", "error");
+  } finally {
+    definirCarregamento(botao, false);
   }
 }
 
-async function carregarFila() {
+async function carregarFila(botao) {
   const tbody = document.getElementById("filaBody");
   const totalFila = document.getElementById("totalFila");
   const totalHumano = document.getElementById("totalHumano");
+  const navFilaCount = document.getElementById("navFilaCount");
   const ultimaAtualizacao = document.getElementById("ultimaAtualizacao");
 
   let fila = [];
 
   try {
+    definirCarregamento(botao, true);
+    if (botao) mostrarCarregamentoTabela(tbody, 6, "Atualizando fila...");
     const response = await fetchAdmin(`${API_BASE_URL}/api/fila`);
+    if (!response.ok) throw new Error("Erro ao carregar fila");
     fila = await response.json();
   } catch (error) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="empty">
+        <td colspan="6" class="empty">
           Não foi possível carregar a fila.
         </td>
       </tr>
     `;
+    mostrarToast("Fila indisponível", "Não foi possível buscar os atendimentos.", "error");
     return;
+  } finally {
+    definirCarregamento(botao, false);
   }
 
   totalFila.textContent = fila.length;
   totalHumano.textContent = fila.length;
+  if (navFilaCount) navFilaCount.textContent = fila.length;
   ultimaAtualizacao.textContent = agora();
 
   if (!fila.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="empty">
+        <td colspan="6" class="empty">
           Nenhum cliente aguardando atendimento humano.
         </td>
       </tr>
@@ -258,13 +342,12 @@ async function carregarFila() {
   <span>CPF: ${item.cpf || "-"}</span>
 </div>
           </td>
-          <td>${item.cpf || "-"}</td>
           <td>${item.site || "-"}</td>
           <td>${item.mensagem || "-"}</td>
           <td>${item.horario || "-"}</td>
           <td><span class="badge">${item.status || "aguardando"}</span></td>
           <td>
-            <button class="danger" onclick="encerrarAtendimento('${item.numero}')">
+            <button class="button secondary" onclick="encerrarAtendimento('${item.numero}')">
               Encerrar
             </button>
           </td>
@@ -296,7 +379,7 @@ function renderizarTabelaMetricas(tbody, itens, colunaNome, vazioTexto) {
     .join("");
 }
 
-async function carregarMetricas() {
+async function carregarMetricas(botao) {
   const totalHumanoHoje = document.getElementById("totalHumanoHoje");
   const metricasStatus = document.getElementById("metricasStatus");
   const metricasEmpty = document.getElementById("metricasEmpty");
@@ -304,6 +387,11 @@ async function carregarMetricas() {
   const motivoBody = document.getElementById("metricasMotivoBody");
 
   try {
+    definirCarregamento(botao, true);
+    if (botao) {
+      mostrarCarregamentoTabela(siteBody, 2, "Atualizando métricas...");
+      mostrarCarregamentoTabela(motivoBody, 2, "Atualizando métricas...");
+    }
     const response = await fetchAdmin(`${API_BASE_URL}/api/metrics/today`);
 
     if (!response.ok) {
@@ -337,6 +425,9 @@ async function carregarMetricas() {
 
     renderizarTabelaMetricas(siteBody, [], "site", "Não foi possível carregar as métricas.");
     renderizarTabelaMetricas(motivoBody, [], "motivo", "Não foi possível carregar as métricas.");
+    mostrarToast("Métricas indisponíveis", "Não foi possível atualizar os indicadores.", "error");
+  } finally {
+    definirCarregamento(botao, false);
   }
 }
 
@@ -349,21 +440,27 @@ function mostrarStatusResetOperacional(texto, tipo = "info") {
   status.className = `status-message ${tipo}`;
 }
 
-async function resetOperacional() {
-  const confirmar = confirm(
-    "Essa ação vai limpar fila, atendimentos ativos, mensagens finais enviadas, timers pendentes e métricas do dia. Não apaga sites cadastrados nem configurações. Deseja continuar?"
-  );
+function abrirResetOperacional() {
+  const dialog = document.getElementById("resetDialog");
+  const password = document.getElementById("resetPassword");
+  if (!dialog) return;
+  if (password) password.value = "";
+  dialog.showModal();
+  setTimeout(() => password?.focus(), 50);
+}
 
-  if (!confirmar) return;
+function fecharResetOperacional() {
+  document.getElementById("resetDialog")?.close();
+}
 
-  const password = prompt("Digite sua senha de admin para confirmar");
-
-  if (!password) {
-    mostrarStatusResetOperacional("Reset cancelado.", "error");
-    return;
-  }
+async function confirmarResetOperacional(event) {
+  event.preventDefault();
+  const botao = document.getElementById("resetConfirmButton");
+  const password = document.getElementById("resetPassword")?.value;
+  if (!password) return;
 
   try {
+    definirCarregamento(botao, true);
     mostrarStatusResetOperacional("Executando reset operacional...");
 
     const response = await fetchAdmin(
@@ -388,10 +485,15 @@ async function resetOperacional() {
       "Reset operacional executado com sucesso.",
       "success"
     );
+    mostrarToast("Reset concluído", "O estado operacional foi limpo com sucesso.", "success");
+    fecharResetOperacional();
     await carregarFila();
     await carregarMetricas();
   } catch (error) {
     mostrarStatusResetOperacional(error.message, "error");
+    mostrarToast("Reset não executado", error.message, "error");
+  } finally {
+    definirCarregamento(botao, false);
   }
 }
 
@@ -402,18 +504,30 @@ async function encerrarAtendimento(numero) {
 
   if (!confirmar) return;
 
-  await fetchAdmin(`${API_BASE_URL}/api/fila/encerrar`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ numero }),
-  });
+  try {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/fila/encerrar`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ numero }),
+    });
 
-  carregarFila();
+    if (!response.ok) throw new Error("Não foi possível encerrar o atendimento.");
+    mostrarToast("Atendimento encerrado", "O fluxo de confirmação foi iniciado no WhatsApp.", "success");
+    await carregarFila();
+  } catch (error) {
+    mostrarToast("Erro ao encerrar", error.message, "error");
+  }
 }
 
 mostrarSecao("atendimentos");
 carregarConfig();
 carregarFila();
+document
+  .getElementById("perguntaConfirmacaoFinal")
+  ?.addEventListener("input", atualizarPreviewConversa);
+document
+  .getElementById("mensagemFinal")
+  ?.addEventListener("input", atualizarPreviewConversa);
 setInterval(carregarFila, 10000);

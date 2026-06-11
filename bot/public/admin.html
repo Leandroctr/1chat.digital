@@ -3,287 +3,103 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>1Chat Digital | Atendimento</title>
+  <meta name="theme-color" content="#080b12" />
+  <title>1Chat | Central de Operacoes</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="layout">
+  <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-logo">
-          <img
-            src="/assets/logo.png"
-            alt="1Chat"
-            onerror="this.hidden=true; this.parentElement.classList.add('logo-failed');"
-          />
-          <div class="brand-fallback">
-            <h1>1Chat</h1>
-            <span>Central de atendimento</span>
-          </div>
-        </div>
+        <div class="brand-mark">1</div>
+        <div class="brand-copy"><strong>1CHAT</strong><span>Central de operacoes</span></div>
       </div>
 
-      <nav class="menu">
+      <nav class="menu" aria-label="Navegacao principal">
         <button class="menu-item active" type="button" data-section="atendimentos" onclick="mostrarSecao('atendimentos')">
-          Atendimentos
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8h10M7 12h7M5 20l-1-4a9 9 0 1 1 4 3Z"/></svg><span>Atendimentos</span><b id="navFilaCount">0</b>
         </button>
         <button class="menu-item" type="button" data-section="mensagemFinal" onclick="mostrarSecao('mensagemFinal')">
-          Mensagem Final
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 13h5"/></svg><span>Mensagem final</span>
         </button>
         <button class="menu-item" type="button" data-section="metricas" onclick="mostrarSecao('metricas')">
-          Métricas
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9M12 19V5M19 19v-7"/></svg><span>Metricas</span>
         </button>
       </nav>
 
-      <div class="sidebar-footer">
-        <span>Sistema local</span>
-        <strong>Online</strong>
-        <form action="/admin/logout" method="POST">
-          <button class="logout-button" type="submit">Sair</button>
-        </form>
+      <div class="sidebar-spacer"></div>
+      <div class="service-card">
+        <div class="service-card-head"><span class="live-dot"></span><strong>WAHA conectado</strong></div>
+        <p>Tunel ativo e recebendo eventos.</p>
+        <div class="uptime"><span>Disponibilidade</span><b>Operacional</b></div>
       </div>
+      <form action="/admin/logout" method="POST"><button class="logout-button" type="submit">Sair do painel</button></form>
     </aside>
 
-    <main class="content">
-      <section id="sectionAtendimentos" class="page-section active">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Operação de suporte</p>
-            <h2>Fila de atendimento humano</h2>
-            <span>Gerencie clientes que solicitaram operador.</span>
-          </div>
+    <main class="workspace">
+      <div class="workspace-top">
+        <div class="breadcrumb"><span>1Chat</span><i>/</i><strong>Painel operacional</strong></div>
+        <div class="top-status"><span class="live-dot"></span> Sistema online</div>
+      </div>
 
-          <button class="primary" onclick="carregarFila()">Atualizar fila</button>
+      <section id="sectionAtendimentos" class="page-section active">
+        <header class="page-header">
+          <div><p class="kicker">ATENDIMENTO EM TEMPO REAL</p><h1>Fila humana</h1><span>Acompanhe e resolva solicitacoes que precisam de uma pessoa.</span></div>
+          <button class="button primary" type="button" data-loading-text="Atualizando..." onclick="carregarFila(this)"><span>Atualizar fila</span></button>
         </header>
 
-        <section class="metrics">
-          <div class="metric-card">
-            <span>Na fila</span>
-            <strong id="totalFila">0</strong>
-            <small>Aguardando operador</small>
-          </div>
-
-          <div class="metric-card">
-            <span>Status bot</span>
-            <strong class="green">Online</strong>
-            <small>WAHA + Node local</small>
-          </div>
-
-          <div class="metric-card">
-            <span>Modo humano</span>
-            <strong id="totalHumano">0</strong>
-            <small>Automação pausada</small>
-          </div>
-
-          <div class="metric-card">
-            <span>Atualização</span>
-            <strong id="ultimaAtualizacao">--:--</strong>
-            <small>Atualiza a cada 10s</small>
-          </div>
+        <section class="stat-grid">
+          <article class="stat-card accent"><div class="stat-top"><span>AGUARDANDO</span><i class="pulse-ring"></i></div><strong id="totalFila">0</strong><p>clientes na fila agora</p></article>
+          <article class="stat-card"><div class="stat-top"><span>MODO HUMANO</span><em>AO VIVO</em></div><strong id="totalHumano">0</strong><p>automacoes pausadas</p></article>
+          <article class="stat-card status"><div class="stat-top"><span>INTEGRACAO</span><i class="live-dot"></i></div><strong>Online</strong><p>WAHA e webhook operacionais</p></article>
+          <article class="stat-card"><div class="stat-top"><span>SINCRONIZACAO</span></div><strong id="ultimaAtualizacao">--:--</strong><p>atualizacao automatica em 10s</p></article>
         </section>
 
-        <section class="panel">
-          <div class="panel-header">
-            <div>
-              <h3>Atendimentos aguardando</h3>
-              <p>O operador responde pelo WhatsApp. Aqui ele apenas encerra o atendimento.</p>
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>CPF</th>
-                  <th>Site</th>
-                  <th>Última mensagem</th>
-                  <th>Horário</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="filaBody">
-                <tr>
-                  <td colspan="7" class="empty">Carregando fila...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <section class="surface queue-surface">
+          <div class="surface-header"><div><span class="surface-label">FILA ATUAL</span><h2>Solicitacoes aguardando</h2></div><div class="surface-meta"><span class="live-dot"></span> Atualizacao automatica</div></div>
+          <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Origem</th><th>Ultima mensagem</th><th>Entrada</th><th>Status</th><th></th></tr></thead><tbody id="filaBody"><tr><td colspan="6" class="empty"><span class="spinner"></span>Sincronizando atendimentos...</td></tr></tbody></table></div>
         </section>
       </section>
 
       <section id="sectionMensagemFinal" class="page-section">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Configuração</p>
-            <h2>Mensagem final</h2>
-            <span>Configure a mensagem enviada somente ao encerrar o atendimento humano.</span>
-          </div>
-        </header>
+        <header class="page-header"><div><p class="kicker">AUTOMACAO DE ENCERRAMENTO</p><h1>Mensagem final</h1><span>Configure o fechamento e visualize a experiencia do cliente.</span></div><div class="save-indicator"><span class="live-dot"></span> Configuracao sincronizada</div></header>
 
-        <section class="panel config-panel">
-          <div class="panel-header">
-            <div>
-              <h3>Mensagem final</h3>
-              <p>Defina a confirmação, o delay e o texto final do encerramento.</p>
+        <div class="editor-layout">
+          <section class="surface editor-surface">
+            <div class="surface-header"><div><span class="surface-label">CONFIGURACAO</span><h2>Fluxo de encerramento</h2></div></div>
+            <form class="config-form" onsubmit="salvarConfig(event)">
+              <label class="switch-card"><span><strong>Mensagem final ativa</strong><small>Dispara apos a confirmacao do cliente.</small></span><input type="checkbox" id="mensagemFinalAtiva" /><i></i></label>
+              <div class="field-grid"><label class="field"><span>Pergunta de confirmacao</span><input id="perguntaConfirmacaoFinal" type="text" placeholder="Te ajudo em algo mais?" /></label><label class="field compact"><span>Espera</span><div class="input-suffix"><input id="delayMensagemFinal" type="number" min="0" step="1" /><b>seg</b></div></label></div>
+              <label class="field"><span>Texto da mensagem final</span><textarea id="mensagemFinal" rows="6" placeholder="Digite a mensagem final"></textarea><small id="messageCounter">0 caracteres</small></label>
+              <div class="media-block"><div><span class="surface-label">MIDIA OPCIONAL</span><h3>Imagem de encerramento</h3><p>PNG, JPG ou WebP. Recomendado 1080 x 1920.</p></div><div class="media-row"><div class="image-preview-box"><img id="mensagemFinalImagePreview" class="image-preview" alt="Preview da imagem final" hidden /><span id="mensagemFinalImageEmpty">Sem imagem</span></div><div class="media-actions"><input id="mensagemFinalImage" type="file" accept="image/jpeg,image/png,image/webp" /><div><button class="button secondary" type="button" data-loading-text="Enviando..." onclick="enviarImagemMensagemFinal(this)">Enviar imagem</button><button class="button text-danger" type="button" data-loading-text="Removendo..." onclick="removerImagemMensagemFinal(this)">Remover</button></div><span id="imageStatus" class="status-message"></span></div></div></div>
+              <div class="form-actions"><span id="configStatus" class="status-message"></span><button class="button primary" type="submit" data-loading-text="Salvando...">Salvar alteracoes</button></div>
+            </form>
+          </section>
+
+          <aside class="preview-column">
+            <div class="preview-heading"><span class="surface-label">PREVIEW AO VIVO</span><b>WhatsApp</b></div>
+            <div class="phone-preview">
+              <div class="phone-top"><div class="avatar">1</div><div><strong>Suporte 1Chat</strong><span><i class="live-dot"></i> online</span></div><b>•••</b></div>
+              <div class="chat-area"><div class="chat-date">HOJE</div><div class="bubble incoming" id="previewPergunta">Te ajudo em algo mais?<small>13:42</small></div><div class="bubble outgoing">Nao, obrigado!<small>13:43 ✓✓</small></div><div class="bubble incoming final-bubble"><div id="previewImagePlaceholder" class="bubble-image">Imagem opcional</div><span id="previewMensagem">Obrigado pelo contato. Conte com a nossa equipe!</span><small>13:43</small></div></div>
+              <div class="chat-input"><span>Mensagem</span><b>➤</b></div>
             </div>
-          </div>
-
-          <form class="config-form" onsubmit="salvarConfig(event)">
-            <label class="checkbox-row">
-              <input type="checkbox" id="mensagemFinalAtiva" />
-              <span>Ativar mensagem final</span>
-            </label>
-
-            <div class="config-grid">
-              <label>
-                <span>Pergunta de confirmação</span>
-                <input id="perguntaConfirmacaoFinal" type="text" placeholder="Te ajudo em algo mais?" />
-              </label>
-
-              <label>
-                <span>Delay em segundos</span>
-                <input id="delayMensagemFinal" type="number" min="0" step="1" />
-              </label>
-            </div>
-
-            <label>
-              <span>Mensagem final</span>
-              <textarea id="mensagemFinal" rows="5" placeholder="Digite a mensagem final"></textarea>
-            </label>
-
-            <div class="image-config">
-              <div class="image-config-header">
-                <div>
-                  <strong>Imagem da mensagem final</strong>
-                  <span>Recomendado: 1080x1920</span>
-                </div>
-              </div>
-
-              <div class="image-preview-box">
-                <img id="mensagemFinalImagePreview" class="image-preview" alt="Preview da imagem final" hidden />
-                <span id="mensagemFinalImageEmpty" class="image-empty">Nenhuma imagem configurada</span>
-              </div>
-
-              <label>
-                <span>Enviar imagem</span>
-                <input id="mensagemFinalImage" type="file" accept="image/jpeg,image/png,image/webp" />
-              </label>
-
-              <div class="config-actions">
-                <button class="secondary" type="button" onclick="enviarImagemMensagemFinal()">Enviar imagem</button>
-                <button class="danger" type="button" onclick="removerImagemMensagemFinal()">Remover imagem</button>
-                <span id="imageStatus" class="status-message"></span>
-              </div>
-            </div>
-
-            <div class="config-actions">
-              <button class="primary" type="submit">Salvar configuração</button>
-              <span id="configStatus" class="status-message"></span>
-            </div>
-          </form>
-        </section>
+            <p class="preview-note">O preview acompanha suas alteracoes enquanto voce digita.</p>
+          </aside>
+        </div>
       </section>
 
       <section id="sectionMetricas" class="page-section">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Indicadores</p>
-            <h2>Métricas</h2>
-            <span>Acompanhe os encaminhamentos para atendimento humano no dia.</span>
-          </div>
-
-          <button class="primary" onclick="carregarMetricas()">Atualizar métricas</button>
-        </header>
-
-        <section class="metrics metrics-summary">
-          <div class="metric-card metric-card-large">
-            <span>Atendimentos humanos hoje</span>
-            <strong id="totalHumanoHoje">0</strong>
-            <small id="metricasStatus">Atualizado ao abrir a aba</small>
-          </div>
-        </section>
-
-        <p id="metricasEmpty" class="empty metricas-empty" hidden>
-          Nenhum atendimento humano registrado hoje.
-        </p>
-
-        <section class="metrics-tables">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h3>Chamados por site</h3>
-                <p>Total de encaminhamentos agrupados por site identificado.</p>
-              </div>
-            </div>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Site</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody id="metricasSiteBody">
-                  <tr>
-                    <td colspan="2" class="empty">Carregando métricas...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h3>Chamados por motivo</h3>
-                <p>Total de encaminhamentos agrupados pelo motivo detectado.</p>
-              </div>
-            </div>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Motivo</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody id="metricasMotivoBody">
-                  <tr>
-                    <td colspan="2" class="empty">Carregando métricas...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </section>
-
-        <section class="panel admin-tools-panel">
-          <div class="panel-header">
-            <div>
-              <h3>Ferramentas administrativas</h3>
-              <p>Ações operacionais para uso controlado durante o MVP.</p>
-            </div>
-          </div>
-
-          <div class="admin-tools">
-            <div>
-              <strong>Reset operacional</strong>
-              <span>Limpa fila, atendimentos ativos, controles temporários e métricas.</span>
-            </div>
-            <button class="danger" type="button" onclick="resetOperacional()">
-              Reset operacional
-            </button>
-            <span id="resetOperacionalStatus" class="status-message"></span>
-          </div>
-        </section>
+        <header class="page-header"><div><p class="kicker">VISAO OPERACIONAL</p><h1>Metricas do dia</h1><span>Entenda onde e por que os clientes precisam de atendimento humano.</span></div><button class="button primary" type="button" data-loading-text="Atualizando..." onclick="carregarMetricas(this)">Atualizar dados</button></header>
+        <section class="metric-hero"><div><span>ATENDIMENTOS HUMANOS HOJE</span><strong id="totalHumanoHoje">0</strong><small id="metricasStatus">Atualizado ao abrir a aba</small></div><div class="hero-visual"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></section>
+        <p id="metricasEmpty" class="empty metricas-empty" hidden>Nenhum atendimento humano registrado hoje.</p>
+        <section class="analytics-grid"><section class="surface"><div class="surface-header"><div><span class="surface-label">ORIGEM</span><h2>Chamados por site</h2></div></div><div class="metric-list"><table><tbody id="metricasSiteBody"><tr><td colspan="2" class="empty"><span class="spinner"></span>Carregando...</td></tr></tbody></table></div></section><section class="surface"><div class="surface-header"><div><span class="surface-label">INTENCAO</span><h2>Chamados por motivo</h2></div></div><div class="metric-list"><table><tbody id="metricasMotivoBody"><tr><td colspan="2" class="empty"><span class="spinner"></span>Carregando...</td></tr></tbody></table></div></section></section>
+        <section class="danger-zone"><div><span>ACAO IRREVERSIVEL</span><h3>Reset operacional</h3><p>Limpa fila, atendimentos ativos, temporizadores e metricas do dia.</p></div><button class="button danger" type="button" data-loading-text="Executando..." onclick="abrirResetOperacional(this)">Executar reset</button><span id="resetOperacionalStatus" class="status-message"></span></section>
       </section>
     </main>
   </div>
 
+  <dialog id="resetDialog" class="reset-dialog"><form method="dialog" onsubmit="confirmarResetOperacional(event)"><div class="dialog-icon">!</div><h2>Confirmar reset operacional</h2><p>Esta acao limpa o estado operacional atual. Configuracoes e sites cadastrados serao mantidos.</p><label class="field"><span>Senha de administrador</span><input id="resetPassword" type="password" autocomplete="current-password" required /></label><div class="dialog-actions"><button class="button secondary" type="button" onclick="fecharResetOperacional()">Cancelar</button><button id="resetConfirmButton" class="button danger" type="submit" data-loading-text="Executando...">Confirmar reset</button></div></form></dialog>
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="/app.js"></script>
 </body>
 </html>
