@@ -70,6 +70,10 @@ function configurarMiddlewares({
     return next();
   });
   app.use((req, res, next) => {
+    if (req.path === "/") {
+      return res.redirect("/admin");
+    }
+
     if (req.path === "/admin.html") {
       return res.redirect("/admin");
     }
