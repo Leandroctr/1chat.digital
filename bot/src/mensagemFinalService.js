@@ -16,27 +16,41 @@ function criarMensagemFinalService({
   const timersMensagemFinal = new Map();
   let verificandoMensagensFinaisPendentes = false;
 
+  function logMensagemFinal(evento, numero, dados = {}) {
+    const detalhes = Object.entries(dados)
+      .filter(([, valor]) => valor !== undefined && valor !== null)
+      .map(([chave, valor]) => `${chave}=${valor}`)
+      .join(" | ");
+    const linha = `[FINAL_MESSAGE] ${evento} | numero=${numero}${detalhes ? ` | ${detalhes}` : ""}`;
+
+    console.log(linha);
+    escreverLog(linha);
+  }
+
   async function enviarMensagemFinal(numero) {
     const config = await carregarConfig();
     const temImagem = Boolean(config.final_message_image_url);
     const temTexto = Boolean(config.mensagem_final.trim());
 
-    escreverLog(
-      `FINAL CONFIG | ${numero} | ativa=${config.mensagem_final_ativa ? "sim" : "nao"} | imagem=${temImagem ? "sim" : "nao"} | texto=${temTexto ? "sim" : "nao"}`
-    );
+    logMensagemFinal("checagem_config", numero, {
+      ativa: config.mensagem_final_ativa ? "sim" : "nao",
+      imagem: temImagem ? "sim" : "nao",
+      texto: temTexto ? "sim" : "nao",
+      regra: "uma_vez_por_dia_calendario",
+    });
 
     if (
       !config.mensagem_final_ativa ||
       (!temImagem && !temTexto)
     ) {
-      escreverLog(`MENSAGEM FINAL DESATIVADA | ${numero}`);
+      logMensagemFinal("nao_enviada_config_desativada", numero);
       return false;
     }
 
     const registrouEnvio = await registrarMensagemFinalEnviada(numero);
 
     if (!registrouEnvio) {
-      escreverLog(`MENSAGEM FINAL JÁ ENVIADA HOJE | ${numero}`);
+      logMensagemFinal("bloqueada_ja_enviada_hoje", numero);
       return false;
     }
 
@@ -44,28 +58,28 @@ function criarMensagemFinalService({
 
     if (temImagem) {
       try {
-        escreverLog(`FINAL ENVIANDO IMAGEM | ${numero}`);
+        logMensagemFinal("enviando_imagem", numero);
         await enviarImagem(numero, config.final_message_image_url);
         enviouAlgo = true;
-        escreverLog(`IMAGEM MENSAGEM FINAL ENVIADA | ${numero}`);
+        logMensagemFinal("imagem_enviada", numero);
       } catch (error) {
-        escreverLog(`ERRO IMAGEM MENSAGEM FINAL | ${numero} | ${error.message}`);
+        logMensagemFinal("erro_imagem", numero, { erro: error.message });
       }
     }
 
     if (temTexto) {
-      escreverLog(`FINAL ENVIANDO TEXTO | ${numero}`);
+      logMensagemFinal("enviando_texto", numero);
       await enviarMensagem(numero, config.mensagem_final);
       enviouAlgo = true;
-      escreverLog(`FINAL TEXTO ENVIADO | ${numero}`);
+      logMensagemFinal("texto_enviado", numero);
     }
 
     if (!enviouAlgo) {
-      escreverLog(`MENSAGEM FINAL NAO ENVIADA | ${numero}`);
+      logMensagemFinal("nao_enviada_sem_midia_ou_texto_entregue", numero);
       return false;
     }
 
-    escreverLog(`MENSAGEM FINAL ENVIADA | ${numero}`);
+    logMensagemFinal("enviada", numero);
     return true;
   }
 

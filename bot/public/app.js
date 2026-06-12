@@ -15,6 +15,7 @@ const API_BASE_URL =
   localStorage.getItem("API_BASE_URL") ||
   "";
 let respostasCache = [];
+let imagemPreviewLocalUrl = "";
 
 function escaparHtml(valor) {
   return String(valor ?? "")
@@ -130,6 +131,23 @@ function mostrarStatusImagem(texto, tipo = "info") {
   status.className = `status-message ${tipo}`;
 }
 
+function atualizarPreviewImagemConversa(imageUrl) {
+  const placeholder = document.getElementById("previewImagePlaceholder");
+
+  if (!placeholder) return;
+
+  if (imageUrl) {
+    placeholder.textContent = "";
+    placeholder.classList.add("has-image");
+    placeholder.style.backgroundImage = `url("${String(imageUrl).replaceAll('"', "%22")}")`;
+    return;
+  }
+
+  placeholder.classList.remove("has-image");
+  placeholder.style.removeProperty("background-image");
+  placeholder.textContent = "Imagem opcional";
+}
+
 function atualizarPreviewImagem(config) {
   const preview = document.getElementById("mensagemFinalImagePreview");
   const vazio = document.getElementById("mensagemFinalImageEmpty");
@@ -140,12 +158,14 @@ function atualizarPreviewImagem(config) {
     preview.src = config.final_message_image_url;
     preview.hidden = false;
     vazio.hidden = true;
+    atualizarPreviewImagemConversa(config.final_message_image_url);
     return;
   }
 
   preview.removeAttribute("src");
   preview.hidden = true;
   vazio.hidden = false;
+  atualizarPreviewImagemConversa("");
 }
 
 function atualizarPreviewConversa() {
@@ -761,4 +781,31 @@ document
 document
   .getElementById("mensagemFinal")
   ?.addEventListener("input", atualizarPreviewConversa);
+document
+  .getElementById("mensagemFinalImage")
+  ?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+
+    if (imagemPreviewLocalUrl) {
+      URL.revokeObjectURL(imagemPreviewLocalUrl);
+      imagemPreviewLocalUrl = "";
+    }
+
+    if (!file) {
+      carregarConfig();
+      return;
+    }
+
+    imagemPreviewLocalUrl = URL.createObjectURL(file);
+    const preview = document.getElementById("mensagemFinalImagePreview");
+    const vazio = document.getElementById("mensagemFinalImageEmpty");
+
+    if (preview && vazio) {
+      preview.src = imagemPreviewLocalUrl;
+      preview.hidden = false;
+      vazio.hidden = true;
+    }
+
+    atualizarPreviewImagemConversa(imagemPreviewLocalUrl);
+  });
 setInterval(carregarFila, 10000);
