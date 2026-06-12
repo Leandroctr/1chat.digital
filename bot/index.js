@@ -73,16 +73,17 @@ const {
 
 const app = express();
 
+const pool = USAR_POSTGRES
+  ? new Pool({ connectionString: process.env.DATABASE_URL })
+  : null;
+
 configurarMiddlewares({
   app,
+  pool,
   publicDir: path.join(__dirname, "public"),
   SESSION_SECRET,
   logWarn,
 });
-
-const pool = USAR_POSTGRES
-  ? new Pool({ connectionString: process.env.DATABASE_URL })
-  : null;
 const {
   enviarMensagem,
   enviarImagem,
@@ -109,7 +110,13 @@ garantirArquivoJson(ARQUIVO_FILA, []);
 garantirArquivoJson(ARQUIVO_CONFIG, CONFIG_PADRAO);
 garantirArquivoJson(ARQUIVO_FINAL_MESSAGE_LOG, {});
 
-const { buscarResposta } = criarRespostasService({
+const {
+  adicionarResposta,
+  atualizarResposta,
+  buscarResposta,
+  listarRespostas,
+  removerResposta,
+} = criarRespostasService({
   ARQUIVO_RESPOSTAS,
   escreverLog,
   normalizarTexto,
@@ -228,6 +235,10 @@ registrarAdminRoutes({
   supabaseConfigurado,
   uploadImagemFinal,
   removerImagemFinal,
+  listarRespostas,
+  adicionarResposta,
+  atualizarResposta,
+  removerResposta,
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,

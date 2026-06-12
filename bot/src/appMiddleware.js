@@ -1,8 +1,10 @@
 const express = require("express");
 const session = require("express-session");
+const PgSession = require("connect-pg-simple")(session);
 
 function configurarMiddlewares({
   app,
+  pool,
   publicDir,
   SESSION_SECRET,
   logWarn,
@@ -37,6 +39,13 @@ function configurarMiddlewares({
 
   app.use(session({
     name: "1chat.admin.sid",
+    store: pool
+      ? new PgSession({
+          pool,
+          tableName: "admin_sessions",
+          createTableIfMissing: true,
+        })
+      : undefined,
     secret: SESSION_SECRET || "1chat-dev-session-secret",
     resave: false,
     saveUninitialized: false,
