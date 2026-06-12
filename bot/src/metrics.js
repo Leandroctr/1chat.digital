@@ -92,7 +92,16 @@ function detectarMotivo(mensagem = "") {
     },
     {
       motivo: "deposito",
-      palavras: ["deposito", "depositei", "pix enviado", "pagamento"],
+      palavras: [
+        "deposito",
+        "depositei",
+        "fiz o pix",
+        "nao caiu",
+        "nao entrou",
+        "pix enviado",
+        "recarga",
+        "saldo nao entrou",
+      ],
     },
     {
       motivo: "senha",

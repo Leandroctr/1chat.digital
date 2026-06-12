@@ -17,6 +17,7 @@ function registrarWebhookRoute({
   estaEmModoHumano,
   pediuOperador,
   enviarMensagem,
+  pareceNomeCliente,
   primeiroNome,
   validarCPF,
   buscarResposta,
@@ -106,15 +107,28 @@ function registrarWebhookRoute({
         escreverLog(`MODO HUMANO | ${numero}`);
         return res.sendStatus(200);
       }
+
+      if (pediuOperador(mensagemNormalizada)) {
+        await encaminharParaHumano(numero, mensagemTexto);
+        return res.sendStatus(200);
+      }
   
       if (atendimento.etapa === "inicio") {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe apenas seu primeiro nome.");
         escreverLog(`PEDIU NOME | ${numero}`);
         return res.sendStatus(200);
       }
   
       if (atendimento.etapa === "aguardando_nome") {
+        if (!pareceNomeCliente(mensagemTexto)) {
+          await enviarMensagem(
+            numero,
+            "Para eu iniciar, envie apenas seu primeiro nome. Exemplo: João. Depois você me conta o problema."
+          );
+          escreverLog(`NOME INVALIDO OU MENSAGEM DE PROBLEMA | ${numero} | ${mensagemTexto}`);
+          return res.sendStatus(200);
+        }
         const nomeCliente = primeiroNome(mensagemTexto);
   
         await atualizarAtendimento(numero, {
@@ -175,14 +189,14 @@ function registrarWebhookRoute({
   
       if (atendimento.etapa === "liberado" && (!atendimento.nome || !atendimento.cpf || !atendimento.site)) {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe apenas seu primeiro nome.");
         escreverLog(`CADASTRO INCOMPLETO | PEDIU NOME | ${numero}`);
         return res.sendStatus(200);
       }
   
       if (atendimento.etapa !== "liberado") {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe apenas seu primeiro nome.");
         escreverLog(`ETAPA INVALIDA | PEDIU NOME | ${numero}`);
         return res.sendStatus(200);
       }
@@ -217,11 +231,6 @@ function registrarWebhookRoute({
         return res.sendStatus(200);
       }
 
-      if (pediuOperador(mensagemNormalizada)) {
-        await encaminharParaHumano(numero, mensagemTexto);
-        return res.sendStatus(200);
-      }
-  
       escreverLog(`CHAMANDO IA | ${numero}`);
       logInfo("IA", "Chamada IA iniciada", { numero });
       const inicioIA = Date.now();

@@ -49,6 +49,7 @@ const {
   dataBanco,
   horarioAtual,
   normalizarTexto,
+  pareceNomeCliente,
   primeiroNome,
 } = require("./src/textUtils");
 const { criarDb } = require("./src/db");
@@ -268,6 +269,7 @@ registrarWebhookRoute({
   estaEmModoHumano,
   pediuOperador,
   enviarMensagem,
+  pareceNomeCliente,
   primeiroNome,
   validarCPF,
   buscarResposta,
