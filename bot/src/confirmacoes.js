@@ -39,8 +39,42 @@ function usuarioNegouVideo(mensagemNormalizada) {
 }
 
 function pediuOperador(mensagemNormalizada) {
-  const palavrasOperador = ["operador", "humano", "atendente", "suporte"];
-  return palavrasOperador.some((palavra) => mensagemNormalizada.includes(palavra));
+  const comandosExatos = [
+    "operador",
+    "atendente",
+    "humano",
+    "suporte",
+    "mano",
+    "falar com alguem",
+    "falar com uma pessoa",
+    "falar com pessoa",
+    "quero falar com alguem",
+    "quero falar com uma pessoa",
+    "quero falar com o operador",
+    "quero falar com operador",
+    "quero falar com atendente",
+    "preciso falar com alguem",
+    "preciso falar com uma pessoa",
+    "chamar operador",
+    "chamar atendente",
+  ];
+
+  if (comandosExatos.includes(mensagemNormalizada)) {
+    return true;
+  }
+
+  const padroesOperador = [
+    /\boperador\b/,
+    /\batendente\b/,
+    /\bhumano\b/,
+    /\bsuporte\b/,
+    /\bfalar com alguem\b/,
+    /\bfalar com uma pessoa\b/,
+    /\bquero falar\b/,
+    /\bpreciso falar\b/,
+  ];
+
+  return padroesOperador.some((padrao) => padrao.test(mensagemNormalizada));
 }
 
 module.exports = {

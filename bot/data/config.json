@@ -1,5 +1,6 @@
 {
   "mensagem_final_ativa": false,
   "mensagem_final": "",
-  "delay_mensagem_final_segundos": 20
+  "delay_mensagem_final_segundos": 20,
+  "pergunta_confirmacao_final": "Te ajudo em algo mais?"
 }

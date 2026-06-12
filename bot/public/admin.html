@@ -102,6 +102,11 @@
           <div class="response-summary"><span><b id="respostasTotal">0</b> registros</span><span><b id="respostasAtivas">0</b> ativos</span></div>
           <button class="button secondary" type="button" data-loading-text="Recarregando..." onclick="carregarRespostas(this)">Recarregar</button>
         </section>
+        <section class="response-test">
+          <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg><input id="respostasTesteMensagem" type="text" placeholder="Teste uma mensagem do cliente. Ex.: quero falar com operador" /></label>
+          <button class="button secondary" type="button" data-loading-text="Testando..." onclick="testarResposta(this)">Testar resposta publicada</button>
+          <span id="respostasTesteStatus" class="status-message"></span>
+        </section>
 
         <section class="surface response-surface">
           <div class="surface-header"><div><span class="surface-label">RESPOSTAS.XLSX</span><h2>Conteudo publicado</h2></div><div class="surface-meta"><span class="live-dot"></span> Alteracoes salvas no arquivo</div></div>
@@ -129,7 +134,7 @@
         <label class="field full"><span>Resposta</span><textarea id="respostaTexto" required rows="7" placeholder="Texto enviado ao cliente"></textarea></label>
         <label class="field full"><span>Link do video</span><input id="respostaVideo" type="text" inputmode="url" placeholder="https://..." /></label>
         <label class="switch-card compact-switch"><span><strong>Resposta ativa</strong><small>Disponivel para a busca automatica.</small></span><input id="respostaAtiva" type="checkbox" checked /><i></i></label>
-        <details class="advanced-fields full"><summary>Campos avancados</summary><div class="advanced-grid"><label class="field"><span>Categoria</span><input id="respostaCategoria" type="text" /></label><label class="field"><span>Prioridade</span><input id="respostaPrioridade" type="number" value="0" /></label><label class="field full"><span>Sinonimos</span><input id="respostaSinonimos" type="text" placeholder="termo 1; termo 2" /></label><label class="field full"><span>Observacao interna</span><input id="respostaObservacao" type="text" /></label></div></details>
+        <details class="advanced-fields full"><summary>Campos avancados</summary><div class="advanced-grid"><label class="field"><span>Categoria</span><input id="respostaCategoria" type="text" /></label><label class="field"><span>Prioridade</span><input id="respostaPrioridade" type="number" value="0" /></label><label class="switch-card compact-switch full"><span><strong>Encaminhar para operador</strong><small>Marca esta resposta para entrar na fila humana.</small></span><input id="respostaEncaminharHumano" type="checkbox" /><i></i></label><label class="field full"><span>Sinonimos</span><input id="respostaSinonimos" type="text" placeholder="termo 1; termo 2" /></label><label class="field full"><span>Observacao interna</span><input id="respostaObservacao" type="text" /></label></div></details>
       </div>
       <div class="dialog-actions"><span id="respostaStatus" class="status-message"></span><button class="button secondary" type="button" onclick="fecharEditorResposta()">Cancelar</button><button id="respostaSalvarButton" class="button primary" type="submit" data-loading-text="Salvando...">Salvar resposta</button></div>
     </form>

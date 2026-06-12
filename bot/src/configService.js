@@ -2,7 +2,7 @@ const CONFIG_PADRAO = {
   mensagem_final_ativa: false,
   mensagem_final: "",
   delay_mensagem_final_segundos: 20,
-  pergunta_confirmacao_final: "Posso te ajudar com algo mais?",
+  pergunta_confirmacao_final: "Te ajudo em algo mais?",
   final_message_image_url: "",
   final_message_image_path: "",
   final_message_image_mime: "",

@@ -1,5 +1,5 @@
 const MENSAGEM_ENCAMINHAMENTO_HUMANO =
-  "Encaminhei você para uma operadora. Aguarde, em instantes você será atendido.";
+  "Aguarde um momento, um dos nossos operadores irá te atender.";
 
 function criarHumanoService({
   ativarModoHumano,
@@ -9,7 +9,7 @@ function criarHumanoService({
   enviarMensagem,
   escreverLog,
 }) {
-  async function encaminharParaHumano(numero, mensagemTexto) {
+  async function encaminharParaHumano(numero, mensagemTexto, opcoes = {}) {
     if (await estaEmModoHumano(numero)) {
       escreverLog(`MODO HUMANO | ${numero}`);
       return;
@@ -22,7 +22,9 @@ function criarHumanoService({
       mensagemTexto,
       origem: "pedido_usuario",
     });
-    await enviarMensagem(numero, MENSAGEM_ENCAMINHAMENTO_HUMANO);
+    if (opcoes.enviarMensagem !== false) {
+      await enviarMensagem(numero, opcoes.mensagem || MENSAGEM_ENCAMINHAMENTO_HUMANO);
+    }
     escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
   }
 

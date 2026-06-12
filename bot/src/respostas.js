@@ -208,6 +208,7 @@ function criarRespostasService({ ARQUIVO_RESPOSTAS, escreverLog, normalizarTexto
             ? limparPerguntaVideoDoTexto(limparLinksDoTexto(item.resposta))
             : String(item.resposta).trim(),
           linkVideo,
+          encaminharHumano: normalizarTexto(item.encaminhar_humano) === "sim",
         };
       }
     }

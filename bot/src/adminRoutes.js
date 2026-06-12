@@ -27,6 +27,7 @@ function registrarAdminRoutes({
   adicionarResposta,
   atualizarResposta,
   removerResposta,
+  buscarResposta,
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
@@ -132,6 +133,31 @@ function registrarAdminRoutes({
     res.json(listarRespostas());
   });
 
+  app.post("/api/respostas/testar", autenticarAdmin, (req, res) => {
+    const mensagem = String(req.body?.mensagem || "").trim();
+
+    if (!mensagem) {
+      return res.status(400).json({ erro: "Mensagem de teste nao informada" });
+    }
+
+    const resposta = buscarResposta(mensagem);
+
+    if (!resposta) {
+      return res.json({
+        encontrou: false,
+        mensagem,
+      });
+    }
+
+    return res.json({
+      encontrou: true,
+      mensagem,
+      resposta: resposta.texto,
+      video: resposta.linkVideo || "",
+      encaminhar_humano: Boolean(resposta.encaminharHumano),
+    });
+  });
+
   app.post("/api/respostas", autenticarAdmin, async (req, res) => {
     try {
       return res.status(201).json(await adicionarResposta(req.body || {}));
@@ -186,7 +212,7 @@ function registrarAdminRoutes({
     try {
       await pool.query(`
         TRUNCATE fila, atendimentos, final_message_log,
-          final_message_pending, human_handoff_events
+          final_message_pending
         RESTART IDENTITY
       `);
 

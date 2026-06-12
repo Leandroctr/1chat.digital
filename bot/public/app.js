@@ -480,7 +480,7 @@ function renderizarRespostas(itens) {
       <td><div class="response-question"><strong>${escaparHtml(item.pergunta)}</strong><span>${escaparHtml(item.categoria || "Sem categoria")}</span></div></td>
       <td><div class="response-copy">${escaparHtml(item.resposta)}</div></td>
       <td>${video ? `<a class="video-link" href="${escaparHtml(video)}" target="_blank" rel="noopener">Abrir</a>` : "-"}</td>
-      <td><span class="boolean-status ${item.ativo ? "active" : ""}">${item.ativo ? "Ativo" : "Inativo"}</span></td>
+      <td><div class="status-stack"><span class="boolean-status ${item.ativo ? "active" : ""}">${item.ativo ? "Ativo" : "Inativo"}</span>${item.encaminhar_humano === "sim" ? '<span class="human-status">Operador</span>' : ""}</div></td>
       <td><div class="response-actions"><button class="icon-button" type="button" onclick="abrirEditorResposta(${item.id})">Editar</button><button class="icon-button remove" type="button" onclick="excluirResposta(${item.id})">Remover</button></div></td>
     </tr>`;
   }).join("");
@@ -539,6 +539,8 @@ function abrirEditorResposta(id) {
   preencherCampo("respostaSinonimos", item?.sinonimos || "");
   preencherCampo("respostaObservacao", item?.observacao || "");
   document.getElementById("respostaAtiva").checked = item?.ativo ?? true;
+  document.getElementById("respostaEncaminharHumano").checked =
+    item?.encaminhar_humano === "sim";
   document.getElementById("respostaDialogTitulo").textContent =
     item ? "Editar resposta" : "Nova resposta";
   document.getElementById("respostaStatus").textContent = "";
@@ -561,6 +563,9 @@ async function salvarResposta(event) {
     ativo: document.getElementById("respostaAtiva").checked,
     categoria: document.getElementById("respostaCategoria").value,
     prioridade: Number(document.getElementById("respostaPrioridade").value),
+    encaminhar_humano: document.getElementById("respostaEncaminharHumano").checked
+      ? "sim"
+      : "nao",
     sinonimos: document.getElementById("respostaSinonimos").value,
     observacao: document.getElementById("respostaObservacao").value,
   };
@@ -603,6 +608,57 @@ async function excluirResposta(id) {
     mostrarToast("Resposta removida", "A planilha foi atualizada.", "success");
   } catch (error) {
     mostrarToast("Erro ao remover", error.message, "error");
+  }
+}
+
+async function testarResposta(botao) {
+  const campo = document.getElementById("respostasTesteMensagem");
+  const status = document.getElementById("respostasTesteStatus");
+  const mensagem = campo?.value.trim();
+
+  if (!mensagem) {
+    if (status) {
+      status.textContent = "Digite uma mensagem para testar.";
+      status.className = "status-message error";
+    }
+    return;
+  }
+
+  try {
+    definirCarregamento(botao, true);
+    if (status) {
+      status.textContent = "Consultando base publicada...";
+      status.className = "status-message";
+    }
+
+    const response = await fetchAdmin(`${API_BASE_URL}/api/respostas/testar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mensagem }),
+    });
+    const resultado = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(resultado.erro || "Nao foi possivel testar.");
+    }
+
+    if (!resultado.encontrou) {
+      status.textContent = "Nenhuma resposta publicada encontrada para esse texto.";
+      status.className = "status-message error";
+      return;
+    }
+
+    status.textContent = resultado.encaminhar_humano
+      ? `Encontrou resposta e encaminha para operador: ${resultado.resposta}`
+      : `Encontrou resposta: ${resultado.resposta}`;
+    status.className = "status-message success";
+  } catch (error) {
+    if (status) {
+      status.textContent = error.message;
+      status.className = "status-message error";
+    }
+  } finally {
+    definirCarregamento(botao, false);
   }
 }
 

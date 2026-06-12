@@ -179,8 +179,6 @@ const {
   cancelarTimerMensagemFinalPersistente,
   enviarMensagemFinal,
   iniciarFluxoEncerramento,
-  iniciarFluxoPosResposta,
-  iniciarPerguntaFinal,
   iniciarVerificadorMensagensFinaisPendentes,
 } = criarMensagemFinalService({
   USAR_POSTGRES,
@@ -193,9 +191,7 @@ const {
   salvarMensagemFinalPendente,
   buscarMensagensFinaisPendentes,
   obterOuCriarAtendimento,
-  atualizarAtendimento,
   limparAtendimento,
-  estaEmModoHumano,
   primeiroNome,
   escreverLog,
 });
@@ -239,6 +235,7 @@ registrarAdminRoutes({
   adicionarResposta,
   atualizarResposta,
   removerResposta,
+  buscarResposta,
   removerDaFila,
   atualizarAtendimento,
   iniciarFluxoEncerramento,
@@ -266,7 +263,6 @@ registrarWebhookRoute({
   limparAtendimento,
   atualizarAtendimento,
   usuarioConfirmouVideo,
-  iniciarPerguntaFinal,
   usuarioNegouVideo,
   encaminharParaHumano,
   estaEmModoHumano,
@@ -276,7 +272,6 @@ registrarWebhookRoute({
   validarCPF,
   buscarResposta,
   PERGUNTA_VIDEO,
-  iniciarFluxoPosResposta,
   perguntarIA,
 });
 

@@ -9,9 +9,7 @@ function criarMensagemFinalService({
   salvarMensagemFinalPendente,
   buscarMensagensFinaisPendentes,
   obterOuCriarAtendimento,
-  atualizarAtendimento,
   limparAtendimento,
-  estaEmModoHumano,
   primeiroNome,
   escreverLog,
 }) {
@@ -120,41 +118,6 @@ function criarMensagemFinalService({
     await iniciarPerguntaFinal(numero, "encerramento_humano");
   }
 
-  async function iniciarFluxoPosResposta(numero) {
-    if (timersMensagemFinal.has(numero)) {
-      escreverLog(`TIMER POS RESPOSTA JA EXISTE | ${numero}`);
-      return;
-    }
-
-    if (await estaEmModoHumano(numero)) {
-      escreverLog(`POS RESPOSTA IGNORADO MODO HUMANO | ${numero}`);
-      return;
-    }
-
-    const atendimento = await obterOuCriarAtendimento(numero);
-
-    if (atendimento?.etapa !== "liberado") {
-      escreverLog(`POS RESPOSTA IGNORADO ETAPA | ${numero} | ${atendimento?.etapa || "sem_atendimento"}`);
-      return;
-    }
-
-    const config = await carregarConfig();
-
-    if (
-      !config.mensagem_final_ativa ||
-      (!config.final_message_image_url && !config.mensagem_final.trim())
-    ) {
-      escreverLog(`POS RESPOSTA IGNORADO MENSAGEM FINAL DESATIVADA | ${numero}`);
-      return;
-    }
-
-    await atualizarAtendimento(numero, {
-      modo: "bot",
-      etapa: "aguardando_confirmacao_pos_resposta",
-    });
-    await iniciarPerguntaFinal(numero, "pos_resposta");
-  }
-
   async function verificarMensagensFinaisPendentes() {
     if (!USAR_POSTGRES || verificandoMensagensFinaisPendentes) return;
 
@@ -192,8 +155,6 @@ function criarMensagemFinalService({
     cancelarTimerMensagemFinalPersistente,
     enviarMensagemFinal,
     iniciarFluxoEncerramento,
-    iniciarFluxoPosResposta,
-    iniciarPerguntaFinal,
     iniciarVerificadorMensagensFinaisPendentes,
   };
 }

@@ -12,7 +12,6 @@ function registrarWebhookRoute({
   limparAtendimento,
   atualizarAtendimento,
   usuarioConfirmouVideo,
-  iniciarPerguntaFinal,
   usuarioNegouVideo,
   encaminharParaHumano,
   estaEmModoHumano,
@@ -22,7 +21,6 @@ function registrarWebhookRoute({
   validarCPF,
   buscarResposta,
   PERGUNTA_VIDEO,
-  iniciarFluxoPosResposta,
   perguntarIA,
 }) {
   app.post("/webhook", async (req, res) => {
@@ -78,9 +76,9 @@ function registrarWebhookRoute({
           escreverLog(`CONFIRMACAO VIDEO POSITIVA | ${numero} | ${mensagemTexto}`);
           await atualizarAtendimento(numero, {
             modo: "bot",
-            etapa: "aguardando_confirmacao_final",
+            etapa: "liberado",
           });
-          await iniciarPerguntaFinal(numero, "confirmacao_video");
+          await enviarMensagem(numero, "Que bom. Se precisar de mais alguma coisa, e so me chamar.");
           return res.sendStatus(200);
         }
   
@@ -98,28 +96,14 @@ function registrarWebhookRoute({
   
       if (atendimento.etapa === "aguardando_confirmacao_pos_resposta") {
         await cancelarTimerMensagemFinalPersistente(numero);
-  
-        if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
-          escreverLog(`CONFIRMACAO FINAL | ${numero}`);
-          await enviarMensagemFinal(numero);
-          await limparAtendimento(numero);
-          escreverLog(`POS RESPOSTA ENCERRADO PELO USUARIO | ${numero}`);
-          return res.sendStatus(200);
-        }
-  
         await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
         atendimento.modo = "bot";
         atendimento.etapa = "liberado";
-        escreverLog(`POS RESPOSTA CONTINUOU ATENDIMENTO | ${numero} | ${mensagemTexto}`);
+        escreverLog(`POS RESPOSTA LEGADO CANCELADO | ${numero} | ${mensagemTexto}`);
       }
   
       if (await estaEmModoHumano(numero)) {
         escreverLog(`MODO HUMANO | ${numero}`);
-        return res.sendStatus(200);
-      }
-  
-      if (pediuOperador(mensagemNormalizada)) {
-        await encaminharParaHumano(numero, mensagemTexto);
         return res.sendStatus(200);
       }
   
@@ -208,6 +192,15 @@ function registrarWebhookRoute({
   
       if (respostaEncontrada?.texto) {
         escreverLog(`RESPOSTA PLANILHA ENCONTRADA | ${numero}`);
+
+        if (respostaEncontrada.encaminharHumano) {
+          escreverLog(`RESPOSTA PLANILHA ENCAMINHA HUMANO | ${numero}`);
+          await encaminharParaHumano(numero, mensagemTexto, {
+            mensagem: respostaEncontrada.texto,
+          });
+          return res.sendStatus(200);
+        }
+
         await enviarMensagem(numero, respostaEncontrada.texto);
   
         if (respostaEncontrada.linkVideo) {
@@ -221,7 +214,11 @@ function registrarWebhookRoute({
           return res.sendStatus(200);
         }
   
-        await iniciarFluxoPosResposta(numero);
+        return res.sendStatus(200);
+      }
+
+      if (pediuOperador(mensagemNormalizada)) {
+        await encaminharParaHumano(numero, mensagemTexto);
         return res.sendStatus(200);
       }
   
@@ -236,18 +233,14 @@ function registrarWebhookRoute({
           escreverLog(`RESPOSTA | ${numero} | ${respostaIA}`);
           logInfo("IA", "Resposta IA concluida", { numero, duracaoMs: Date.now() - inicioIA });
           await enviarMensagem(numero, respostaIA);
-          await iniciarFluxoPosResposta(numero);
           return res.sendStatus(200);
         }
       } catch (errorIA) {
         escreverLog(`ERRO IA | ${numero} | ${errorIA.message}`);
         logError("IA", "Erro IA", errorIA, { numero, duracaoMs: Date.now() - inicioIA });
       }
-  
-      await enviarMensagem(
-        numero,
-        "Não encontrei essa informação agora. Vou encaminhar para atendimento humano."
-      );
+      escreverLog(`SEM RESPOSTA | ENCAMINHANDO HUMANO | ${numero}`);
+      await encaminharParaHumano(numero, mensagemTexto);
   
       return res.sendStatus(200);
     } catch (error) {
