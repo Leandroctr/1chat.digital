@@ -71,6 +71,7 @@ function configurarMiddlewares({
   });
   app.use((req, res, next) => {
     if (req.path === "/") {
+      res.set("Cache-Control", "no-store");
       return res.redirect("/admin");
     }
 
