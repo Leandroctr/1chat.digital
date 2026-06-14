@@ -9,7 +9,9 @@ function criarMensagemFinalService({
   salvarMensagemFinalPendente,
   buscarMensagensFinaisPendentes,
   obterOuCriarAtendimento,
+  atualizarAtendimento,
   limparAtendimento,
+  estaEmModoHumano,
   primeiroNome,
   escreverLog,
 }) {
@@ -107,6 +109,11 @@ function criarMensagemFinalService({
       ? `${nome}, ${config.pergunta_confirmacao_final.charAt(0).toLowerCase()}${config.pergunta_confirmacao_final.slice(1)}`
       : config.pergunta_confirmacao_final;
 
+    await atualizarAtendimento(numero, {
+      modo: "bot",
+      etapa: "aguardando_confirmacao_pos_resposta",
+    });
+
     await enviarMensagem(numero, pergunta);
     escreverLog(`FINAL PERGUNTA ENVIADA | ${numero} | ${origem}`);
     await salvarMensagemFinalPendente(numero, origem, config.delay_mensagem_final_segundos);
@@ -130,6 +137,37 @@ function criarMensagemFinalService({
 
   async function iniciarFluxoEncerramento(numero) {
     await iniciarPerguntaFinal(numero, "encerramento_humano");
+  }
+
+  async function iniciarFluxoPosResposta(numero) {
+    if (timersMensagemFinal.has(numero)) {
+      escreverLog(`TIMER POS RESPOSTA JA EXISTE | ${numero}`);
+      return;
+    }
+
+    if (await estaEmModoHumano(numero)) {
+      escreverLog(`POS RESPOSTA IGNORADO MODO HUMANO | ${numero}`);
+      return;
+    }
+
+    const atendimento = await obterOuCriarAtendimento(numero);
+
+    if (atendimento?.etapa !== "liberado") {
+      escreverLog(`POS RESPOSTA IGNORADO ETAPA | ${numero} | ${atendimento?.etapa || "sem_atendimento"}`);
+      return;
+    }
+
+    const config = await carregarConfig();
+
+    if (
+      !config.mensagem_final_ativa ||
+      (!config.final_message_image_url && !config.mensagem_final.trim())
+    ) {
+      escreverLog(`POS RESPOSTA IGNORADO MENSAGEM FINAL DESATIVADA | ${numero}`);
+      return;
+    }
+
+    await iniciarPerguntaFinal(numero, "pos_resposta");
   }
 
   async function verificarMensagensFinaisPendentes() {
@@ -169,6 +207,8 @@ function criarMensagemFinalService({
     cancelarTimerMensagemFinalPersistente,
     enviarMensagemFinal,
     iniciarFluxoEncerramento,
+    iniciarFluxoPosResposta,
+    iniciarPerguntaFinal,
     iniciarVerificadorMensagensFinaisPendentes,
   };
 }
