@@ -1,4 +1,4 @@
-// Módulo para ler e buscar respostas na planilha Excel
+// Módulo para ler e buscar respostas nas planilhas Excel
 const XLSX = require('xlsx');
 const path = require('path');
 
