@@ -180,6 +180,7 @@ const {
   cancelarTimerMensagemFinalPersistente,
   enviarMensagemFinal,
   iniciarFluxoEncerramento,
+  iniciarFluxoPosResposta,
   iniciarVerificadorMensagensFinaisPendentes,
 } = criarMensagemFinalService({
   USAR_POSTGRES,
@@ -192,7 +193,9 @@ const {
   salvarMensagemFinalPendente,
   buscarMensagensFinaisPendentes,
   obterOuCriarAtendimento,
+  atualizarAtendimento,
   limparAtendimento,
+  estaEmModoHumano,
   primeiroNome,
   escreverLog,
 });
@@ -274,6 +277,7 @@ registrarWebhookRoute({
   validarCPF,
   buscarResposta,
   PERGUNTA_VIDEO,
+  iniciarFluxoPosResposta,
   perguntarIA,
 });
 
