@@ -25,6 +25,27 @@ function registrarWebhookRoute({
   iniciarFluxoPosResposta,
   perguntarIA,
 }) {
+  const encerramentosRecentes = new Map();
+  const TEMPO_BLOQUEIO_ENCERRAMENTO_MS = 5 * 60 * 1000;
+
+  function usuarioRepetiuNegacaoEncerramento(mensagemNormalizada) {
+    return ["nao", "n", "nao obrigado", "nao obrigada"].includes(mensagemNormalizada);
+  }
+
+  function marcarEncerramentoRecente(numero) {
+    const timerAnterior = encerramentosRecentes.get(numero);
+
+    if (timerAnterior) {
+      clearTimeout(timerAnterior);
+    }
+
+    const timer = setTimeout(() => {
+      encerramentosRecentes.delete(numero);
+    }, TEMPO_BLOQUEIO_ENCERRAMENTO_MS);
+
+    encerramentosRecentes.set(numero, timer);
+  }
+
   app.post("/webhook", async (req, res) => {
     try {
       const payload = req.body;
@@ -55,6 +76,14 @@ function registrarWebhookRoute({
       console.log(mensagemTexto);
   
       const atendimento = await obterOuCriarAtendimento(numero);
+
+      if (
+        encerramentosRecentes.has(numero) &&
+        usuarioRepetiuNegacaoEncerramento(mensagemNormalizada)
+      ) {
+        escreverLog(`[WEBHOOK] mensagem_final_fluxo_encerrado | ${numero} | ${mensagemTexto}`);
+        return res.sendStatus(200);
+      }
   
       if (atendimento.etapa === "aguardando_confirmacao_final") {
         await cancelarTimerMensagemFinalPersistente(numero);
@@ -63,7 +92,10 @@ function registrarWebhookRoute({
           escreverLog(`CONFIRMACAO FINAL | ${numero}`);
           await enviarMensagemFinal(numero);
           await limparAtendimento(numero);
+          marcarEncerramentoRecente(numero);
+          escreverLog(`[WEBHOOK] mensagem_final_fluxo_encerrado | ${numero}`);
           escreverLog(`ENCERRAMENTO CONFIRMADO | ${numero}`);
+          escreverLog(`[WEBHOOK] encerramento_confirmado_return | ${numero}`);
           return res.sendStatus(200);
         }
   
@@ -81,12 +113,14 @@ function registrarWebhookRoute({
             etapa: "aguardando_confirmacao_final",
           });
           await iniciarPerguntaFinal(numero, "confirmacao_video");
+          escreverLog(`[WEBHOOK] encerramento_confirmado_return | ${numero}`);
           return res.sendStatus(200);
         }
   
         if (usuarioNegouVideo(mensagemNormalizada)) {
           escreverLog(`CONFIRMACAO VIDEO NEGATIVA | ${numero} | ${mensagemTexto}`);
           await encaminharParaHumano(numero, mensagemTexto);
+          escreverLog(`[WEBHOOK] negacao_video_return | ${numero}`);
           return res.sendStatus(200);
         }
   
@@ -103,7 +137,10 @@ function registrarWebhookRoute({
           escreverLog(`CONFIRMACAO FINAL | ${numero}`);
           await enviarMensagemFinal(numero);
           await limparAtendimento(numero);
+          marcarEncerramentoRecente(numero);
+          escreverLog(`[WEBHOOK] mensagem_final_fluxo_encerrado | ${numero}`);
           escreverLog(`POS RESPOSTA ENCERRADO PELO USUARIO | ${numero}`);
+          escreverLog(`[WEBHOOK] encerramento_confirmado_return | ${numero}`);
           return res.sendStatus(200);
         }
   
@@ -125,7 +162,7 @@ function registrarWebhookRoute({
   
       if (atendimento.etapa === "inicio") {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+        await enviarMensagem(numero, "Ol?! Para iniciar o atendimento, informe seu nome.");
         escreverLog(`PEDIU NOME | ${numero}`);
         return res.sendStatus(200);
       }
@@ -152,10 +189,10 @@ function registrarWebhookRoute({
         if (!validacao.valido) {
           await enviarMensagem(
             numero,
-            `❌ ${validacao.mensagem}\n\nPor favor, informe um CPF válido (apenas números).`
+            `? ${validacao.mensagem}\n\nPor favor, informe um CPF v?lido (apenas n?meros).`
           );
   
-          escreverLog(`CPF INVÁLIDO | ${numero} | ${mensagemTexto}`);
+          escreverLog(`CPF INV?LIDO | ${numero} | ${mensagemTexto}`);
           return res.sendStatus(200);
         }
   
@@ -166,7 +203,7 @@ function registrarWebhookRoute({
   
         await enviarMensagem(
           numero,
-          "✅ CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma você estava."
+          "? CPF registrado com sucesso!\n\nAgora informe em qual site ou plataforma voc? estava."
         );
   
         escreverLog(`CPF SALVO | ${numero} | ${validacao.cpfFormatado}`);
@@ -191,14 +228,14 @@ function registrarWebhookRoute({
   
       if (atendimento.etapa === "liberado" && (!atendimento.nome || !atendimento.cpf || !atendimento.site)) {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+        await enviarMensagem(numero, "Ol?! Para iniciar o atendimento, informe seu nome.");
         escreverLog(`CADASTRO INCOMPLETO | PEDIU NOME | ${numero}`);
         return res.sendStatus(200);
       }
   
       if (atendimento.etapa !== "liberado") {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
-        await enviarMensagem(numero, "Olá! Para iniciar o atendimento, informe seu nome.");
+        await enviarMensagem(numero, "Ol?! Para iniciar o atendimento, informe seu nome.");
         escreverLog(`ETAPA INVALIDA | PEDIU NOME | ${numero}`);
         return res.sendStatus(200);
       }
@@ -246,7 +283,7 @@ function registrarWebhookRoute({
   
       await enviarMensagem(
         numero,
-        "Não encontrei essa informação agora. Vou encaminhar para atendimento humano."
+        "N?o encontrei essa informa??o agora. Vou encaminhar para atendimento humano."
       );
   
       return res.sendStatus(200);
