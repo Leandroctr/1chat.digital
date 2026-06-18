@@ -25,6 +25,27 @@ function registrarWebhookRoute({
   iniciarFluxoPosResposta,
   perguntarIA,
 }) {
+  const encerramentosRecentes = new Map();
+  const TEMPO_BLOQUEIO_ENCERRAMENTO_MS = 5 * 60 * 1000;
+
+  function usuarioRepetiuNegacaoEncerramento(mensagemNormalizada) {
+    return ["nao", "n", "nao obrigado", "nao obrigada"].includes(mensagemNormalizada);
+  }
+
+  function marcarEncerramentoRecente(numero) {
+    const timerAnterior = encerramentosRecentes.get(numero);
+
+    if (timerAnterior) {
+      clearTimeout(timerAnterior);
+    }
+
+    const timer = setTimeout(() => {
+      encerramentosRecentes.delete(numero);
+    }, TEMPO_BLOQUEIO_ENCERRAMENTO_MS);
+
+    encerramentosRecentes.set(numero, timer);
+  }
+
   app.post("/webhook", async (req, res) => {
     try {
       const payload = req.body;
@@ -56,6 +77,14 @@ function registrarWebhookRoute({
 
       const atendimento = await obterOuCriarAtendimento(numero);
 
+      if (
+        encerramentosRecentes.has(numero) &&
+        usuarioRepetiuNegacaoEncerramento(mensagemNormalizada)
+      ) {
+        escreverLog(`[WEBHOOK] mensagem_final_fluxo_encerrado | ${numero} | ${mensagemTexto}`);
+        return res.sendStatus(200);
+      }
+
       if (atendimento.etapa === "aguardando_confirmacao_final") {
         await cancelarTimerMensagemFinalPersistente(numero);
 
@@ -63,7 +92,10 @@ function registrarWebhookRoute({
           escreverLog(`CONFIRMACAO FINAL | ${numero}`);
           await enviarMensagemFinal(numero);
           await limparAtendimento(numero);
+          marcarEncerramentoRecente(numero);
+          escreverLog(`[WEBHOOK] mensagem_final_fluxo_encerrado | ${numero}`);
           escreverLog(`ENCERRAMENTO CONFIRMADO | ${numero}`);
+          escreverLog(`[WEBHOOK] encerramento_confirmado_return | ${numero}`);
           return res.sendStatus(200);
         }
 
@@ -84,12 +116,14 @@ function registrarWebhookRoute({
           atendimento.etapa = "liberado";
           await enviarMensagem(numero, "Que bom. Se precisar de mais alguma coisa, e so me chamar.");
           await iniciarFluxoPosResposta(numero);
+          escreverLog(`[WEBHOOK] encerramento_confirmado_return | ${numero}`);
           return res.sendStatus(200);
         }
 
         if (usuarioNegouVideo(mensagemNormalizada)) {
           escreverLog(`CONFIRMACAO VIDEO NEGATIVA | ${numero} | ${mensagemTexto}`);
           await encaminharParaHumano(numero, mensagemTexto);
+          escreverLog(`[WEBHOOK] negacao_video_return | ${numero}`);
           return res.sendStatus(200);
         }
 
@@ -101,6 +135,18 @@ function registrarWebhookRoute({
 
       if (atendimento.etapa === "aguardando_confirmacao_pos_resposta") {
         await cancelarTimerMensagemFinalPersistente(numero);
+
+        if (usuarioConfirmouEncerramento(mensagemNormalizada)) {
+          escreverLog(`CONFIRMACAO FINAL | ${numero}`);
+          await enviarMensagemFinal(numero);
+          await limparAtendimento(numero);
+          marcarEncerramentoRecente(numero);
+          escreverLog(`[WEBHOOK] mensagem_final_fluxo_encerrado | ${numero}`);
+          escreverLog(`POS RESPOSTA ENCERRADO PELO USUARIO | ${numero}`);
+          escreverLog(`[WEBHOOK] encerramento_confirmado_return | ${numero}`);
+          return res.sendStatus(200);
+        }
+
         await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
         atendimento.modo = "bot";
         atendimento.etapa = "liberado";
