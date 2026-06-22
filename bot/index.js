@@ -88,6 +88,7 @@ configurarMiddlewares({
 const {
   enviarMensagem,
   enviarImagem,
+  obterStatus: obterStatusWaha,
 } = criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION });
 const {
   estaConfigurado: supabaseConfigurado,
@@ -244,6 +245,7 @@ registrarAdminRoutes({
   atualizarAtendimento,
   iniciarFluxoEncerramento,
   obterMetricasHoje,
+  obterStatusWaha,
   ADMIN_PASSWORD,
   ADMIN_USER,
   escreverLog,

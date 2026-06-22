@@ -31,10 +31,10 @@
       </nav>
 
       <div class="sidebar-spacer"></div>
-      <div class="service-card">
-        <div class="service-card-head"><span class="live-dot"></span><strong>WAHA conectado</strong></div>
-        <p>Tunel ativo e recebendo eventos.</p>
-        <div class="uptime"><span>Disponibilidade</span><b>Operacional</b></div>
+      <div id="wahaServiceCard" class="service-card status-checking">
+        <div class="service-card-head"><span class="live-dot"></span><strong id="wahaStatusLabel">Verificando WAHA</strong></div>
+        <p id="wahaStatusDetail">Consultando tunnel e API.</p>
+        <div class="uptime"><span>Disponibilidade</span><b id="wahaStatusAction">Verificando</b></div>
       </div>
       <form action="/admin/logout" method="POST"><button class="logout-button" type="submit">Sair do painel</button></form>
     </aside>
@@ -54,7 +54,7 @@
         <section class="stat-grid">
           <article class="stat-card accent"><div class="stat-top"><span>AGUARDANDO</span><i class="pulse-ring"></i></div><strong id="totalFila">0</strong><p>clientes na fila agora</p></article>
           <article class="stat-card"><div class="stat-top"><span>MODO HUMANO</span><em>AO VIVO</em></div><strong id="totalHumano">0</strong><p>automacoes pausadas</p></article>
-          <article class="stat-card status"><div class="stat-top"><span>INTEGRACAO</span><i class="live-dot"></i></div><strong>Online</strong><p>WAHA e webhook operacionais</p></article>
+          <article id="integracaoStatusCard" class="stat-card status status-checking"><div class="stat-top"><span>INTEGRACAO</span><i class="live-dot"></i></div><strong id="integracaoStatusLabel">Verificando</strong><p id="integracaoStatusDetail">Consultando WAHA</p></article>
           <article class="stat-card"><div class="stat-top"><span>SINCRONIZACAO</span></div><strong id="ultimaAtualizacao">--:--</strong><p>atualizacao automatica em 10s</p></article>
         </section>
 

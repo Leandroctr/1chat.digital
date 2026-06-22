@@ -32,6 +32,7 @@ function registrarAdminRoutes({
   atualizarAtendimento,
   iniciarFluxoEncerramento,
   obterMetricasHoje,
+  obterStatusWaha,
   ADMIN_PASSWORD,
   ADMIN_USER,
   escreverLog,
@@ -128,6 +129,26 @@ function registrarAdminRoutes({
   app.get("/api/metrics/today", autenticarAdmin, async (req, res) => {
     res.json(await obterMetricasHoje());
   });
+
+  app.get(
+    ["/api/waha-status", "/admin/api/waha-status"],
+    autenticarAdmin,
+    async (req, res) => {
+      try {
+        return res.json(await obterStatusWaha());
+      } catch (error) {
+        logError("ADMIN", "Erro ao consultar status WAHA", error);
+        return res.json({
+          ok: false,
+          status: "error",
+          label: "WAHA desconectado",
+          detail: "Tunnel/WAHA indisponivel",
+          action: "Disponibilidade Offline",
+          checkedAt: new Date().toISOString(),
+        });
+      }
+    }
+  );
 
   app.get("/api/respostas", autenticarAdmin, (req, res) => {
     res.json(listarRespostas());

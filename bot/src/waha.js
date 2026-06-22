@@ -16,6 +16,74 @@ function criarErroWaha(acao, error) {
 }
 
 function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION }) {
+  async function obterStatus() {
+    const checkedAt = new Date().toISOString();
+    const endpoints = ["/api/server/status", "/api/version"];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await axios.get(`${WAHA_URL}${endpoint}`, {
+          headers: { "X-Api-Key": WAHA_API_KEY },
+          timeout: 4000,
+          validateStatus: () => true,
+        });
+
+        if (response.status === 401) {
+          return {
+            ok: false,
+            status: "auth_error",
+            label: "WAHA inacessivel",
+            detail: "Erro de autenticacao",
+            action: "Verificar WAHA_API_KEY",
+            checkedAt,
+          };
+        }
+
+        if (response.status >= 200 && response.status < 300) {
+          return {
+            ok: true,
+            status: "operational",
+            label: "WAHA conectado",
+            detail: "Tunnel ativo",
+            action: "Disponibilidade Operacional",
+            checkedAt,
+          };
+        }
+
+        if (response.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
+          continue;
+        }
+
+        return {
+          ok: false,
+          status: "offline",
+          label: "WAHA desconectado",
+          detail: "Tunnel/WAHA indisponivel",
+          action: "Disponibilidade Offline",
+          checkedAt,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          status: "offline",
+          label: "WAHA desconectado",
+          detail: "Tunnel/WAHA indisponivel",
+          action: "Disponibilidade Offline",
+          checkedAt,
+        };
+      }
+    }
+
+    return {
+      ok: false,
+      status: "error",
+      label: "WAHA desconectado",
+      detail: "Tunnel/WAHA indisponivel",
+      action: "Disponibilidade Offline",
+      checkedAt,
+    };
+  }
+
   async function enviarMensagem(numero, texto) {
     try {
       await axios.post(
@@ -60,6 +128,7 @@ function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION }) {
   return {
     enviarMensagem,
     enviarImagem,
+    obterStatus,
   };
 }
 

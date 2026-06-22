@@ -86,6 +86,65 @@ async function fetchAdmin(url, options) {
   return response;
 }
 
+function aplicarStatusWaha(status) {
+  const serviceCard = document.getElementById("wahaServiceCard");
+  const serviceLabel = document.getElementById("wahaStatusLabel");
+  const serviceDetail = document.getElementById("wahaStatusDetail");
+  const serviceAction = document.getElementById("wahaStatusAction");
+  const integracaoCard = document.getElementById("integracaoStatusCard");
+  const integracaoLabel = document.getElementById("integracaoStatusLabel");
+  const integracaoDetail = document.getElementById("integracaoStatusDetail");
+
+  const classe =
+    status?.status === "operational"
+      ? "status-ok"
+      : status?.status === "auth_error"
+        ? "status-warning"
+        : "status-error";
+  const classes = ["status-ok", "status-warning", "status-error", "status-checking"];
+
+  serviceCard?.classList.remove(...classes);
+  integracaoCard?.classList.remove(...classes);
+  serviceCard?.classList.add(classe);
+  integracaoCard?.classList.add(classe);
+
+  const label = status?.label || "WAHA desconectado";
+  const detail = status?.detail || "Tunnel/WAHA indisponivel";
+  const action = status?.action || "Disponibilidade Offline";
+
+  if (serviceLabel) serviceLabel.textContent = label;
+  if (serviceDetail) serviceDetail.textContent = detail;
+  if (serviceAction) serviceAction.textContent = action.replace("Disponibilidade ", "");
+  if (integracaoLabel) {
+    integracaoLabel.textContent =
+      status?.status === "operational"
+        ? "Online"
+        : status?.status === "auth_error"
+          ? "Auth"
+          : "Offline";
+  }
+  if (integracaoDetail) {
+    integracaoDetail.textContent =
+      status?.status === "auth_error" ? "Verificar WAHA_API_KEY" : detail;
+  }
+}
+
+async function carregarStatusWaha() {
+  try {
+    const response = await fetchAdmin(`${API_BASE_URL}/api/waha-status`);
+    const status = await response.json().catch(() => ({}));
+    aplicarStatusWaha(status);
+  } catch (error) {
+    aplicarStatusWaha({
+      ok: false,
+      status: "offline",
+      label: "WAHA desconectado",
+      detail: "Tunnel/WAHA indisponivel",
+      action: "Disponibilidade Offline",
+    });
+  }
+}
+
 function mostrarSecao(secao) {
   const secoes = {
     atendimentos: document.getElementById("sectionAtendimentos"),
@@ -773,6 +832,7 @@ async function encerrarAtendimento(numero) {
 }
 
 mostrarSecao("atendimentos");
+carregarStatusWaha();
 carregarConfig();
 carregarFila();
 document
@@ -809,3 +869,4 @@ document
     atualizarPreviewImagemConversa(imagemPreviewLocalUrl);
   });
 setInterval(carregarFila, 10000);
+setInterval(carregarStatusWaha, 30000);
