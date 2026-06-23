@@ -80,24 +80,48 @@ function registrarAdminRoutes({
   });
 
   app.post("/admin/login", (req, res) => {
+    escreverLog("[ADMIN_LOGIN] tentativa");
+    escreverLog(
+      `[ADMIN_LOGIN] admin_user_configurado=${ADMIN_USER ? "sim" : "nao"}`
+    );
+    escreverLog(
+      `[ADMIN_LOGIN] admin_password_configurado=${ADMIN_PASSWORD ? "sim" : "nao"}`
+    );
+
     if (!credenciaisConfiguradas) {
+      escreverLog("[ADMIN_LOGIN] falha | motivo=credenciais_nao_configuradas");
       escreverLog("ADMIN LOGIN RECUSADO | credenciais nao configuradas");
       return res.redirect("/admin/login?erro=config");
     }
 
     const usuario = req.body?.usuario || "";
     const senha = req.body?.senha || "";
+    const usuarioOk = valoresIguais(usuario, ADMIN_USER);
+    const senhaOk = valoresIguais(senha, ADMIN_PASSWORD);
 
-    if (
-      valoresIguais(usuario, ADMIN_USER) &&
-      valoresIguais(senha, ADMIN_PASSWORD)
-    ) {
+    escreverLog(
+      `[ADMIN_LOGIN] user_recebido=${usuario ? "sim" : "nao"} | tamanho=${String(usuario).length}`
+    );
+    escreverLog(`[ADMIN_LOGIN] usuario_ok=${usuarioOk}`);
+    escreverLog(`[ADMIN_LOGIN] senha_ok=${senhaOk}`);
+
+    if (usuarioOk && senhaOk) {
       req.session.adminAutenticado = true;
-      escreverLog(`ADMIN LOGIN OK | ${usuario}`);
-      return res.redirect("/admin");
+      return req.session.save((error) => {
+        if (error) {
+          escreverLog(`[ADMIN_LOGIN] falha | motivo=sessao | ${error.message}`);
+          logError("ADMIN", "Erro ao salvar sessao admin", error);
+          return res.redirect("/admin/login?erro=sessao");
+        }
+
+        escreverLog("[ADMIN_LOGIN] sucesso");
+        escreverLog("ADMIN LOGIN OK");
+        return res.redirect("/admin");
+      });
     }
 
-    escreverLog(`ADMIN LOGIN INVALIDO | ${usuario || "sem usuario"}`);
+    escreverLog("[ADMIN_LOGIN] falha | motivo=credenciais");
+    escreverLog("ADMIN LOGIN INVALIDO");
     return res.redirect("/admin/login?erro=credenciais");
   });
 
