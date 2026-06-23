@@ -71,7 +71,9 @@ function criarMensagemFinalService({
 
     if (temTexto) {
       logMensagemFinal("enviando_texto", numero);
-      await enviarMensagem(numero, config.mensagem_final);
+      await enviarMensagem(numero, config.mensagem_final, {
+        humanizeType: "final",
+      });
       enviouAlgo = true;
       logMensagemFinal("texto_enviado", numero);
     }

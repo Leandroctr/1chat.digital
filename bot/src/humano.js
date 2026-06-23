@@ -23,7 +23,9 @@ function criarHumanoService({
       origem: "pedido_usuario",
     });
     if (opcoes.enviarMensagem !== false) {
-      await enviarMensagem(numero, opcoes.mensagem || MENSAGEM_ENCAMINHAMENTO_HUMANO);
+      await enviarMensagem(numero, opcoes.mensagem || MENSAGEM_ENCAMINHAMENTO_HUMANO, {
+        humanizeType: "operator",
+      });
     }
     escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
   }

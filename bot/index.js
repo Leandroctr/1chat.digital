@@ -89,7 +89,7 @@ const {
   enviarMensagem,
   enviarImagem,
   obterStatus: obterStatusWaha,
-} = criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION });
+} = criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION, escreverLog });
 const {
   estaConfigurado: supabaseConfigurado,
   removerImagemFinal,
