@@ -3,11 +3,29 @@ const CONFIG_PADRAO = {
   mensagem_final: "",
   delay_mensagem_final_segundos: 20,
   pergunta_confirmacao_final: "Te ajudo em algo mais?",
+  horario_humano_segunda_sabado_inicio: "09:00",
+  horario_humano_segunda_sabado_fim: "22:00",
+  horario_humano_domingo_inicio: "09:00",
+  horario_humano_domingo_fim: "20:00",
   final_message_image_url: "",
   final_message_image_path: "",
   final_message_image_mime: "",
   final_message_image_size: 0,
 };
+
+function normalizarHorario(valor, fallback) {
+  const texto = String(valor || "").trim();
+  const match = texto.match(/^(\d{2}):(\d{2})$/);
+
+  if (!match) return fallback;
+
+  const hora = Number(match[1]);
+  const minuto = Number(match[2]);
+
+  return hora >= 0 && hora <= 23 && minuto >= 0 && minuto <= 59
+    ? texto
+    : fallback;
+}
 
 function normalizarConfig(config) {
   const delayInformado = Number(config?.delay_mensagem_final_segundos);
@@ -24,6 +42,22 @@ function normalizarConfig(config) {
     delay_mensagem_final_segundos: Math.max(
       0,
       Number.isNaN(delayInformado) ? CONFIG_PADRAO.delay_mensagem_final_segundos : delayInformado
+    ),
+    horario_humano_segunda_sabado_inicio: normalizarHorario(
+      config?.horario_humano_segunda_sabado_inicio,
+      CONFIG_PADRAO.horario_humano_segunda_sabado_inicio
+    ),
+    horario_humano_segunda_sabado_fim: normalizarHorario(
+      config?.horario_humano_segunda_sabado_fim,
+      CONFIG_PADRAO.horario_humano_segunda_sabado_fim
+    ),
+    horario_humano_domingo_inicio: normalizarHorario(
+      config?.horario_humano_domingo_inicio,
+      CONFIG_PADRAO.horario_humano_domingo_inicio
+    ),
+    horario_humano_domingo_fim: normalizarHorario(
+      config?.horario_humano_domingo_fim,
+      CONFIG_PADRAO.horario_humano_domingo_fim
     ),
     final_message_image_url: String(config?.final_message_image_url || ""),
     final_message_image_path: String(config?.final_message_image_path || ""),
@@ -78,6 +112,10 @@ function criarConfigService({ USAR_POSTGRES, pool, ARQUIVO_CONFIG, carregarJson,
       "mensagem_final",
       "delay_mensagem_final_segundos",
       "pergunta_confirmacao_final",
+      "horario_humano_segunda_sabado_inicio",
+      "horario_humano_segunda_sabado_fim",
+      "horario_humano_domingo_inicio",
+      "horario_humano_domingo_fim",
     ];
 
     for (const campo of camposPermitidos) {

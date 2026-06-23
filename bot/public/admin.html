@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#080b12" />
   <title>1Chat | Central de Operacoes</title>
-  <link rel="stylesheet" href="/style.css?v=waha-status-20260622" />
+  <link rel="stylesheet" href="/style.css?v=human-hours-20260623" />
 </head>
 <body>
   <div class="app-shell">
@@ -21,6 +21,9 @@
         </button>
         <button class="menu-item" type="button" data-section="mensagemFinal" onclick="mostrarSecao('mensagemFinal')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 13h5"/></svg><span>Mensagem final</span>
+        </button>
+        <button class="menu-item" type="button" data-section="horarioAtendimento" onclick="mostrarSecao('horarioAtendimento')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg><span>Horario humano</span>
         </button>
         <button class="menu-item" type="button" data-section="metricas" onclick="mostrarSecao('metricas')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9M12 19V5M19 19v-7"/></svg><span>Metricas</span>
@@ -91,6 +94,25 @@
         </div>
       </section>
 
+      <section id="sectionHorarioAtendimento" class="page-section">
+        <header class="page-header"><div><p class="kicker">FILA HUMANA</p><h1>Horario de Atendimento Humano</h1><span>Defina quando pedidos de operador entram direto na fila.</span></div></header>
+
+        <section class="surface editor-surface">
+          <div class="surface-header"><div><span class="surface-label">HORARIO OFICIAL</span><h2>Funcionamento da equipe humana</h2></div></div>
+          <form class="config-form" onsubmit="salvarConfig(event)">
+            <div class="field-grid">
+              <label class="field"><span>Segunda a sabado - inicio</span><input id="horarioHumanoSegundaSabadoInicio" type="time" /></label>
+              <label class="field"><span>Segunda a sabado - fim</span><input id="horarioHumanoSegundaSabadoFim" type="time" /></label>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Domingo - inicio</span><input id="horarioHumanoDomingoInicio" type="time" /></label>
+              <label class="field"><span>Domingo - fim</span><input id="horarioHumanoDomingoFim" type="time" /></label>
+            </div>
+            <div class="form-actions"><span id="horarioStatus" class="status-message"></span><button class="button primary" type="submit" data-loading-text="Salvando...">Salvar horario</button></div>
+          </form>
+        </section>
+      </section>
+
       <section id="sectionRespostas" class="page-section">
         <header class="page-header">
           <div><p class="kicker">CONHECIMENTO DO BOT</p><h1>Base de respostas</h1><span>Edite o conteudo usado nas respostas automaticas sem abrir a planilha.</span></div>
@@ -140,6 +162,6 @@
     </form>
   </dialog>
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
-  <script src="/app.js?v=waha-status-20260622"></script>
+  <script src="/app.js?v=human-hours-20260623"></script>
 </body>
 </html>

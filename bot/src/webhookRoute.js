@@ -15,6 +15,7 @@ function registrarWebhookRoute({
   usuarioNegouVideo,
   encaminharParaHumano,
   estaEmModoHumano,
+  ETAPA_CONFIRMAR_FILA_FORA_HORARIO,
   pediuOperador,
   enviarMensagem,
   pareceNomeCliente,
@@ -158,8 +159,21 @@ function registrarWebhookRoute({
         return res.sendStatus(200);
       }
 
+      if (
+        atendimento.etapa === ETAPA_CONFIRMAR_FILA_FORA_HORARIO &&
+        !pediuOperador(mensagemNormalizada)
+      ) {
+        await atualizarAtendimento(numero, { etapa: "liberado" });
+        atendimento.etapa = "liberado";
+      }
+
       if (pediuOperador(mensagemNormalizada)) {
-        await encaminharParaHumano(numero, mensagemTexto);
+        await encaminharParaHumano(numero, mensagemTexto, {
+          filaForaHorario:
+            atendimento.etapa === ETAPA_CONFIRMAR_FILA_FORA_HORARIO,
+          verificarHorario:
+            atendimento.etapa !== ETAPA_CONFIRMAR_FILA_FORA_HORARIO,
+        });
         return res.sendStatus(200);
       }
 

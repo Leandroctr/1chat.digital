@@ -54,6 +54,9 @@ const {
 } = require("./src/textUtils");
 const { criarDb } = require("./src/db");
 const { criarHumanoService } = require("./src/humano");
+const {
+  ETAPA_CONFIRMAR_FILA_FORA_HORARIO,
+} = require("./src/businessHours");
 const { criarMetricsService } = require("./src/metrics");
 const { registrarAdminRoutes } = require("./src/adminRoutes");
 const { registrarWebhookRoute } = require("./src/webhookRoute");
@@ -219,6 +222,8 @@ const { encaminharParaHumano } = criarHumanoService({
   adicionarNaFila,
   estaEmModoHumano,
   registrarEventoEncaminhamentoHumano,
+  atualizarAtendimento,
+  carregarConfig,
   enviarMensagem,
   escreverLog,
 });
@@ -272,6 +277,7 @@ registrarWebhookRoute({
   usuarioNegouVideo,
   encaminharParaHumano,
   estaEmModoHumano,
+  ETAPA_CONFIRMAR_FILA_FORA_HORARIO,
   pediuOperador,
   enviarMensagem,
   pareceNomeCliente,

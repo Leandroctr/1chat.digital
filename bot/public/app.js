@@ -149,6 +149,7 @@ function mostrarSecao(secao) {
   const secoes = {
     atendimentos: document.getElementById("sectionAtendimentos"),
     mensagemFinal: document.getElementById("sectionMensagemFinal"),
+    horarioAtendimento: document.getElementById("sectionHorarioAtendimento"),
     metricas: document.getElementById("sectionMetricas"),
     respostas: document.getElementById("sectionRespostas"),
   };
@@ -174,6 +175,15 @@ function mostrarSecao(secao) {
 
 function mostrarStatusConfig(texto, tipo = "info") {
   const status = document.getElementById("configStatus");
+
+  if (!status) return;
+
+  status.textContent = texto;
+  status.className = `status-message ${tipo}`;
+}
+
+function mostrarStatusHorario(texto, tipo = "info") {
+  const status = document.getElementById("horarioStatus");
 
   if (!status) return;
 
@@ -258,16 +268,26 @@ async function carregarConfig() {
       config.pergunta_confirmacao_final || "Te ajudo em algo mais?";
     document.getElementById("delayMensagemFinal").value =
       config.delay_mensagem_final_segundos ?? 20;
+    document.getElementById("horarioHumanoSegundaSabadoInicio").value =
+      config.horario_humano_segunda_sabado_inicio || "09:00";
+    document.getElementById("horarioHumanoSegundaSabadoFim").value =
+      config.horario_humano_segunda_sabado_fim || "22:00";
+    document.getElementById("horarioHumanoDomingoInicio").value =
+      config.horario_humano_domingo_inicio || "09:00";
+    document.getElementById("horarioHumanoDomingoFim").value =
+      config.horario_humano_domingo_fim || "20:00";
 
     atualizarPreviewImagem(config);
     atualizarPreviewConversa();
     mostrarStatusConfig("");
+    mostrarStatusHorario("");
     mostrarStatusImagem("");
   } catch (error) {
     mostrarStatusConfig(
       "Não foi possível carregar a configuração.",
       "error"
     );
+    mostrarStatusHorario("Nao foi possivel carregar o horario.", "error");
   }
 }
 
@@ -284,6 +304,14 @@ async function salvarConfig(event) {
       document.getElementById("perguntaConfirmacaoFinal").value,
     delay_mensagem_final_segundos:
       Number(document.getElementById("delayMensagemFinal").value),
+    horario_humano_segunda_sabado_inicio:
+      document.getElementById("horarioHumanoSegundaSabadoInicio").value,
+    horario_humano_segunda_sabado_fim:
+      document.getElementById("horarioHumanoSegundaSabadoFim").value,
+    horario_humano_domingo_inicio:
+      document.getElementById("horarioHumanoDomingoInicio").value,
+    horario_humano_domingo_fim:
+      document.getElementById("horarioHumanoDomingoFim").value,
   };
 
   try {
@@ -310,16 +338,26 @@ async function salvarConfig(event) {
       configSalva.pergunta_confirmacao_final || "Te ajudo em algo mais?";
     document.getElementById("delayMensagemFinal").value =
       configSalva.delay_mensagem_final_segundos ?? 20;
+    document.getElementById("horarioHumanoSegundaSabadoInicio").value =
+      configSalva.horario_humano_segunda_sabado_inicio || "09:00";
+    document.getElementById("horarioHumanoSegundaSabadoFim").value =
+      configSalva.horario_humano_segunda_sabado_fim || "22:00";
+    document.getElementById("horarioHumanoDomingoInicio").value =
+      configSalva.horario_humano_domingo_inicio || "09:00";
+    document.getElementById("horarioHumanoDomingoFim").value =
+      configSalva.horario_humano_domingo_fim || "20:00";
     atualizarPreviewImagem(configSalva);
     atualizarPreviewConversa();
 
     mostrarStatusConfig("Configuração salva.", "success");
+    mostrarStatusHorario("Horario salvo.", "success");
     mostrarToast("Configuração salva", "As alterações já estão ativas.", "success");
   } catch (error) {
     mostrarStatusConfig(
       "Não foi possível salvar a configuração.",
       "error"
     );
+    mostrarStatusHorario("Nao foi possivel salvar o horario.", "error");
     mostrarToast("Erro ao salvar", "Revise os dados e tente novamente.", "error");
   } finally {
     definirCarregamento(botao, false);
