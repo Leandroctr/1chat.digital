@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#080b12" />
   <title>1Chat | Central de Operacoes</title>
-  <link rel="stylesheet" href="/style.css?v=human-hours-20260623" />
+  <link rel="stylesheet" href="/style.css?v=trigger-metrics-20260623" />
 </head>
 <body>
   <div class="app-shell">
@@ -140,7 +140,7 @@
         <header class="page-header"><div><p class="kicker">VISAO OPERACIONAL</p><h1>Metricas do dia</h1><span>Entenda onde e por que os clientes precisam de atendimento humano.</span></div><button class="button primary" type="button" data-loading-text="Atualizando..." onclick="carregarMetricas(this)">Atualizar dados</button></header>
         <section class="metric-hero"><div><span>ATENDIMENTOS HUMANOS HOJE</span><strong id="totalHumanoHoje">0</strong><small id="metricasStatus">Atualizado ao abrir a aba</small></div><div class="hero-visual"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></section>
         <p id="metricasEmpty" class="empty metricas-empty" hidden>Nenhum atendimento humano registrado hoje.</p>
-        <section class="analytics-grid"><section class="surface"><div class="surface-header"><div><span class="surface-label">ORIGEM</span><h2>Chamados por site</h2></div></div><div class="metric-list"><table><tbody id="metricasSiteBody"><tr><td colspan="2" class="empty"><span class="spinner"></span>Carregando...</td></tr></tbody></table></div></section><section class="surface"><div class="surface-header"><div><span class="surface-label">INTENCAO</span><h2>Chamados por motivo</h2></div></div><div class="metric-list"><table><tbody id="metricasMotivoBody"><tr><td colspan="2" class="empty"><span class="spinner"></span>Carregando...</td></tr></tbody></table></div></section></section>
+        <section class="analytics-grid"><section class="surface"><div class="surface-header"><div><span class="surface-label">ORIGEM</span><h2>Chamados por site</h2></div></div><div class="metric-list"><table><tbody id="metricasSiteBody"><tr><td colspan="2" class="empty"><span class="spinner"></span>Carregando...</td></tr></tbody></table></div></section><section class="surface"><div class="surface-header"><div><span class="surface-label">GATILHOS</span><h2>Intencoes detectadas</h2></div></div><div class="metric-list"><table><tbody id="metricasMotivoBody"><tr><td colspan="2" class="empty"><span class="spinner"></span>Carregando...</td></tr></tbody></table></div></section></section>
         <section class="danger-zone"><div><span>ACAO IRREVERSIVEL</span><h3>Reset operacional</h3><p>Limpa fila, atendimentos ativos, temporizadores e metricas do dia.</p></div><button class="button danger" type="button" data-loading-text="Executando..." onclick="abrirResetOperacional(this)">Executar reset</button><span id="resetOperacionalStatus" class="status-message"></span></section>
       </section>
     </main>
@@ -162,6 +162,6 @@
     </form>
   </dialog>
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
-  <script src="/app.js?v=human-hours-20260623"></script>
+  <script src="/app.js?v=trigger-metrics-20260623"></script>
 </body>
 </html>

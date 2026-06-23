@@ -138,6 +138,89 @@ function detectarMotivo(mensagem = "") {
   return categoria?.motivo || "outros";
 }
 
+const CATEGORIAS_GATILHOS = [
+  {
+    motivo: "senha",
+    palavras: [
+      "senha",
+      "recuperar senha",
+      "esqueci senha",
+      "esqueci minha senha",
+      "login",
+      "acesso",
+      "nao consigo entrar",
+      "entrar na conta",
+    ],
+  },
+  {
+    motivo: "saque",
+    palavras: [
+      "saque",
+      "sacar",
+      "retirada",
+      "retirar",
+      "pix",
+      "pagamento",
+      "dinheiro",
+      "nao caiu",
+      "limite de saque",
+    ],
+  },
+  {
+    motivo: "deposito",
+    palavras: [
+      "deposito",
+      "depositei",
+      "pix enviado",
+      "recarga",
+      "colocar dinheiro",
+      "saldo",
+    ],
+  },
+  {
+    motivo: "bonus",
+    palavras: [
+      "bonus",
+      "promocao",
+      "free spin",
+      "rodada gratis",
+      "cashback",
+    ],
+  },
+  {
+    motivo: "sac",
+    palavras: ["sac", "reclamacao", "reclamar", "ajuda", "atendimento"],
+  },
+  {
+    motivo: "operador",
+    palavras: [
+      "operador",
+      "humano",
+      "atendente",
+      "suporte humano",
+      "falar com alguem",
+    ],
+  },
+  {
+    motivo: "cpf_cadastro",
+    palavras: ["cpf", "cadastro", "cadastrar", "conta", "dados cadastrais"],
+  },
+  {
+    motivo: "plataforma",
+    palavras: ["site", "plataforma", "link", "app", "aplicativo"],
+  },
+];
+
+function analisarMetricasPorGatilhos(mensagem = "") {
+  const mensagemNormalizada = normalizarComparacao(mensagem);
+
+  if (!mensagemNormalizada) return [];
+
+  return CATEGORIAS_GATILHOS
+    .filter(({ palavras }) => contemPalavraChave(mensagemNormalizada, palavras))
+    .map(({ motivo }) => motivo);
+}
+
 function criarMetricsService({
   USAR_POSTGRES,
   pool,
@@ -207,6 +290,55 @@ function criarMetricsService({
     }
   }
 
+  async function registrarMetricasMensagem({ numero, mensagemTexto }) {
+    const categorias = analisarMetricasPorGatilhos(mensagemTexto);
+
+    escreverLog(
+      `[METRICS] message_analyzed | numero=${numero} | categorias=${categorias.length}`
+    );
+
+    for (const categoria of categorias) {
+      escreverLog(`[METRICS] category_detected=${categoria} | numero=${numero}`);
+    }
+
+    if (!categorias.length || !USAR_POSTGRES) return categorias;
+
+    try {
+      const atendimento = await obterOuCriarAtendimento(numero);
+      const sites = await carregarSitesConhecidos();
+      const siteIdentificado = identificarSite(atendimento.site, sites);
+
+      for (const categoria of categorias) {
+        await pool.query(
+          `INSERT INTO human_handoff_events
+            (numero, nome, site_informado, site_identificado,
+             motivo_detectado, origem, mensagem)
+           VALUES
+            ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            numero,
+            atendimento.nome || null,
+            atendimento.site || null,
+            siteIdentificado,
+            categoria,
+            "gatilho_mensagem",
+            mensagemTexto,
+          ]
+        );
+      }
+
+      escreverLog(
+        `[METRICS] saved | numero=${numero} | categorias=${categorias.join(",")}`
+      );
+    } catch (error) {
+      logError("METRICS", "Erro ao registrar metricas por gatilho", error, {
+        numero,
+      });
+    }
+
+    return categorias;
+  }
+
   async function obterMetricasHoje() {
     if (!USAR_POSTGRES) {
       return {
@@ -221,6 +353,7 @@ function criarMetricsService({
       FROM human_handoff_events
       WHERE created_at >= CURRENT_DATE
         AND created_at < CURRENT_DATE + INTERVAL '1 day'
+        AND origem <> 'gatilho_mensagem'
     `);
 
     const porSiteQuery = pool.query(`
@@ -229,18 +362,33 @@ function criarMetricsService({
       FROM human_handoff_events
       WHERE created_at >= CURRENT_DATE
         AND created_at < CURRENT_DATE + INTERVAL '1 day'
+        AND origem <> 'gatilho_mensagem'
       GROUP BY COALESCE(site_identificado, 'desconhecido')
       ORDER BY total DESC, site ASC
     `);
 
     const porMotivoQuery = pool.query(`
-      SELECT COALESCE(motivo_detectado, 'outros') AS motivo,
-             COUNT(*)::int AS total
-      FROM human_handoff_events
-      WHERE created_at >= CURRENT_DATE
-        AND created_at < CURRENT_DATE + INTERVAL '1 day'
-      GROUP BY COALESCE(motivo_detectado, 'outros')
-      ORDER BY total DESC, motivo ASC
+      WITH categorias(motivo) AS (
+        VALUES
+          ('senha'),
+          ('saque'),
+          ('deposito'),
+          ('bonus'),
+          ('sac'),
+          ('operador'),
+          ('cpf_cadastro'),
+          ('plataforma')
+      )
+      SELECT categorias.motivo,
+             COUNT(human_handoff_events.id)::int AS total
+      FROM categorias
+      LEFT JOIN human_handoff_events
+        ON human_handoff_events.motivo_detectado = categorias.motivo
+       AND human_handoff_events.origem = 'gatilho_mensagem'
+       AND human_handoff_events.created_at >= CURRENT_DATE
+       AND human_handoff_events.created_at < CURRENT_DATE + INTERVAL '1 day'
+      GROUP BY categorias.motivo
+      ORDER BY total DESC, categorias.motivo ASC
     `);
 
     const [total, porSite, porMotivo] = await Promise.all([
@@ -253,18 +401,22 @@ function criarMetricsService({
       total_humano_hoje: total.rows[0]?.total || 0,
       por_site: porSite.rows,
       por_motivo: porMotivo.rows,
+      por_gatilho: porMotivo.rows,
     };
   }
 
   return {
     carregarSitesConhecidos,
+    registrarMetricasMensagem,
     obterMetricasHoje,
     registrarEventoEncaminhamentoHumano,
   };
 }
 
 module.exports = {
+  analisarMetricasPorGatilhos,
   calcularSimilaridade,
+  CATEGORIAS_GATILHOS,
   criarMetricsService,
   detectarMotivo,
   identificarSite,

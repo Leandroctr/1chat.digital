@@ -16,6 +16,16 @@ const API_BASE_URL =
   "";
 let respostasCache = [];
 let imagemPreviewLocalUrl = "";
+const METRICAS_GATILHO_LABELS = {
+  senha: "Senha",
+  saque: "Saque",
+  deposito: "Deposito",
+  bonus: "Bonus",
+  sac: "SAC",
+  operador: "Operador",
+  cpf_cadastro: "CPF/Cadastro",
+  plataforma: "Plataforma",
+};
 
 function escaparHtml(valor) {
   return String(valor ?? "")
@@ -513,7 +523,7 @@ function renderizarTabelaMetricas(tbody, itens, colunaNome, vazioTexto) {
   tbody.innerHTML = itens
     .map((item) => `
       <tr>
-        <td>${item[colunaNome] || "desconhecido"}</td>
+        <td>${METRICAS_GATILHO_LABELS[item[colunaNome]] || item[colunaNome] || "desconhecido"}</td>
         <td><strong>${item.total || 0}</strong></td>
       </tr>
     `)
@@ -554,9 +564,9 @@ async function carregarMetricas(botao) {
     );
     renderizarTabelaMetricas(
       motivoBody,
-      metricas.por_motivo,
+      metricas.por_gatilho || metricas.por_motivo,
       "motivo",
-      "Nenhum atendimento humano registrado hoje."
+      "Nenhum gatilho registrado hoje."
     );
   } catch (error) {
     totalHumanoHoje.textContent = "0";

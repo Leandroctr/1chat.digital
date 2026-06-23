@@ -209,6 +209,7 @@ const { initDb } = criarDb({
 });
 const {
   obterMetricasHoje,
+  registrarMetricasMensagem,
   registrarEventoEncaminhamentoHumano,
 } = criarMetricsService({
   USAR_POSTGRES,
@@ -269,6 +270,7 @@ registrarWebhookRoute({
   logError,
   obterOuCriarAtendimento,
   cancelarTimerMensagemFinalPersistente,
+  registrarMetricasMensagem,
   usuarioConfirmouEncerramento,
   enviarMensagemFinal,
   limparAtendimento,

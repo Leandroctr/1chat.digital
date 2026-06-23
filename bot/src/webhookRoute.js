@@ -7,6 +7,7 @@ function registrarWebhookRoute({
   logError,
   obterOuCriarAtendimento,
   cancelarTimerMensagemFinalPersistente,
+  registrarMetricasMensagem,
   usuarioConfirmouEncerramento,
   enviarMensagemFinal,
   limparAtendimento,
@@ -72,6 +73,7 @@ function registrarWebhookRoute({
       setTimeout(() => mensagensProcessadas.delete(messageId), 5 * 60 * 1000);
 
       escreverLog(`MENSAGEM | ${numero} | ${mensagemTexto}`);
+      await registrarMetricasMensagem({ numero, mensagemTexto });
       console.log("=================================");
       console.log("MENSAGEM RECEBIDA");
       console.log(mensagemTexto);
