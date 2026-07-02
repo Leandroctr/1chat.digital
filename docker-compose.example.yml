@@ -1,0 +1,15 @@
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    ports:
+      - "${WAHA_PUBLIC_PORT:-3001}:3000"
+    environment:
+      WAHA_API_KEY: "${WAHA_API_KEY:-change-me}"
+      WAHA_DASHBOARD_USERNAME: "${WAHA_DASHBOARD_USERNAME:-admin}"
+      WAHA_DASHBOARD_PASSWORD: "${WAHA_DASHBOARD_PASSWORD:-change-me}"
+      WHATSAPP_SWAGGER_USERNAME: "${WHATSAPP_SWAGGER_USERNAME:-admin}"
+      WHATSAPP_SWAGGER_PASSWORD: "${WHATSAPP_SWAGGER_PASSWORD:-change-me}"
+    volumes:
+      - ./waha-data:/app/.sessions
+      - ./waha-files:/tmp/whatsapp-files
