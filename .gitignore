@@ -27,3 +27,4 @@ bot/data/*.bak
 SECRETS.private.md
 docs/disaster-recovery/SECRETS.private.md
 docker-compose.yml.backup-*
+docker-compose.yml
