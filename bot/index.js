@@ -707,12 +707,136 @@ function pediuOperador(mensagemNormalizada) {
   return palavrasOperador.some((palavra) => mensagemNormalizada.includes(palavra));
 }
 
+function pediuRecuperacaoSenha(mensagemNormalizada) {
+  const gatilhos = [
+    "recuperar senha",
+    "esqueci minha senha",
+    "esqueci a senha",
+    "nao consigo entrar",
+    "nao consigo acessar",
+    "nao consigo fazer login",
+    "nao entra",
+    "nao esta entrando",
+    "nao consigo jogar",
+    "nao abre minha conta",
+    "minha conta nao entra",
+    "login nao funciona",
+  ];
+
+  return gatilhos.some((gatilho) => mensagemNormalizada.includes(gatilho));
+}
+
+function respostaAfirmativa(mensagemNormalizada) {
+  const respostasExatas = ["sim", "s", "isso", "ja", "usei", "ja usei"];
+  if (respostasExatas.includes(mensagemNormalizada)) return true;
+
+  const respostasPorTrecho = ["ja utilizei", "ja cliquei", "ja apertei", "e o mesmo"];
+  return respostasPorTrecho.some((resposta) => mensagemNormalizada.includes(resposta));
+}
+
+function respostaNegativa(mensagemNormalizada) {
+  const respostasExatas = ["nao", "n", "nunca"];
+  if (respostasExatas.includes(mensagemNormalizada)) return true;
+
+  const respostasPorTrecho = ["ainda nao", "nao usei", "nao utilizei", "nao cliquei", "nao apertei", "nao e o mesmo"];
+  return respostasPorTrecho.some((resposta) => mensagemNormalizada.includes(resposta));
+}
+
 async function encaminharParaHumano(numero, mensagemTexto) {
   await ativarModoHumano(numero);
   await adicionarNaFila(numero, mensagemTexto);
   escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
 }
 
+async function iniciarFluxoRecuperacaoSenha(numero) {
+  await atualizarAtendimento(numero, {
+    modo: "bot",
+    etapa: "recuperacao_senha_aguardando_botao",
+  });
+
+  await enviarMensagem(
+    numero,
+    'Para recuperar sua senha, toque no botao "Recuperar senha" na tela de login.\n\nVoce ja utilizou esse botao? Responda com sim ou nao.'
+  );
+
+  escreverLog(`FLUXO RECUPERACAO SENHA INICIADO | ${numero}`);
+}
+
+async function processarFluxoRecuperacaoSenha(numero, mensagemTexto, mensagemNormalizada, etapa) {
+  if (etapa === "recuperacao_senha_aguardando_botao") {
+    if (respostaNegativa(mensagemNormalizada)) {
+      await atualizarAtendimento(numero, {
+        etapa: "recuperacao_senha_aguardando_mesmo_whatsapp",
+      });
+
+      await enviarMensagem(
+        numero,
+        'Tudo bem. Primeiro toque no botao "Recuperar senha" na tela de login.\n\nO WhatsApp que voce esta usando agora e o mesmo cadastrado na sua conta?'
+      );
+
+      escreverLog(`RECUPERACAO SENHA | BOTAO NAO USADO | ${numero}`);
+      return true;
+    }
+
+    if (respostaAfirmativa(mensagemNormalizada)) {
+      await atualizarAtendimento(numero, {
+        etapa: "recuperacao_senha_aguardando_mesmo_whatsapp",
+      });
+
+      await enviarMensagem(
+        numero,
+        "O WhatsApp que voce esta usando agora e o mesmo cadastrado na sua conta?"
+      );
+
+      escreverLog(`RECUPERACAO SENHA | BOTAO USADO | ${numero}`);
+      return true;
+    }
+
+    await enviarMensagem(numero, "Responda apenas com sim ou nao: voce ja utilizou o botao Recuperar senha?");
+    return true;
+  }
+
+  if (etapa === "recuperacao_senha_aguardando_mesmo_whatsapp") {
+    if (respostaNegativa(mensagemNormalizada)) {
+      await atualizarAtendimento(numero, {
+        etapa: "recuperacao_senha_aguardando_novo_telefone",
+      });
+
+      await enviarMensagem(numero, "Informe o novo numero de telefone com DDD.");
+      escreverLog(`RECUPERACAO SENHA | TROCA TELEFONE NECESSARIA | ${numero}`);
+      return true;
+    }
+
+    if (respostaAfirmativa(mensagemNormalizada)) {
+      await atualizarAtendimento(numero, { etapa: "liberado" });
+      await enviarMensagem(
+        numero,
+        "Perfeito. Aguarde o codigo chegar nesse WhatsApp para criar uma nova senha."
+      );
+      escreverLog(`RECUPERACAO SENHA | MESMO WHATSAPP | ${numero}`);
+      return true;
+    }
+
+    await enviarMensagem(numero, "Responda apenas com sim ou nao: este WhatsApp e o mesmo cadastrado na sua conta?");
+    return true;
+  }
+
+  if (etapa === "recuperacao_senha_aguardando_novo_telefone") {
+    const novoTelefone = mensagemTexto.trim();
+    const motivo = "Troca de telefone para recuperacao de senha";
+
+    await encaminharParaHumano(numero, motivo);
+    await enviarMensagem(
+      numero,
+      "Sua solicitacao foi encaminhada para um operador. Ele vai verificar a troca de telefone para recuperacao de senha."
+    );
+
+    escreverLog(`RECUPERACAO SENHA | ENCAMINHADO HUMANO | ${numero} | ${novoTelefone}`);
+    return true;
+  }
+
+  return false;
+}
 app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
@@ -872,6 +996,22 @@ app.post("/webhook", async (req, res) => {
 
       await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
       escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+      return res.sendStatus(200);
+    }
+
+    if (
+      await processarFluxoRecuperacaoSenha(
+        numero,
+        mensagemTexto,
+        mensagemNormalizada,
+        atendimento.etapa
+      )
+    ) {
+      return res.sendStatus(200);
+    }
+
+    if (pediuRecuperacaoSenha(mensagemNormalizada)) {
+      await iniciarFluxoRecuperacaoSenha(numero);
       return res.sendStatus(200);
     }
 

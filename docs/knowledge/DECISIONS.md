@@ -129,3 +129,21 @@ Antes de sugerir troca de stack, esgotar:
 - operacao local;
 - logs;
 - correcao de bugs conhecidos.
+
+## DEC-011 - Recuperacao de senha pelo fluxo do bot
+
+Status: decidido.
+
+Solicitacoes de recuperacao de senha devem ser tratadas por fluxo deterministico do bot antes da planilha e antes do fallback Gemini.
+
+Motivo:
+
+- Evita depender de IA para um procedimento operacional sensivel.
+- Preserva o fluxo atual de coleta de nome, CPF e plataforma.
+- Reutiliza a fila de atendimento humano quando for necessaria troca de telefone.
+
+Orientacao:
+
+- Nao usar `token` como gatilho desse fluxo.
+- Se o WhatsApp atual for o mesmo cadastrado, orientar o cliente a aguardar o codigo.
+- Se o WhatsApp atual nao for o mesmo cadastrado, coletar o novo telefone e encaminhar para humano com o motivo "Troca de telefone para recuperacao de senha".
