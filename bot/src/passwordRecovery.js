@@ -2,10 +2,10 @@ const MENSAGEM_RECUPERACAO_SENHA =
   'Para recuperar sua senha, toque no botao "Recuperar senha" na tela de login do site.\n\nUse o mesmo WhatsApp cadastrado na conta para receber o codigo. Se voce nao tem mais acesso ao telefone cadastrado, avise aqui que vou encaminhar para um atendente.';
 
 const MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE =
-  "Entendi. Informe o novo telefone com DDD para eu encaminhar seu atendimento com contexto.";
+  "Entendi.\n\nEnvie o seu novo número de telefone com DDD para que eu possa deixá-lo disponível ao operador responsável pela atualização do seu cadastro.";
 
 const MENSAGEM_RECUPERACAO_SENHA_NOVO_TELEFONE_RECEBIDO =
-  "Recebi o novo telefone. Encaminhei seu atendimento para um operador verificar com seguranca.";
+  "Perfeito!\n\nRecebi o novo número e encaminhei seu atendimento para um operador realizar a atualização do seu cadastro com segurança.\n\nAguarde alguns instantes. Em breve um operador assumirá esta conversa.";
 
 const ETAPA_RECUPERACAO_SENHA_ORIENTADO = "recuperacao_senha_orientado";
 const ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE =
