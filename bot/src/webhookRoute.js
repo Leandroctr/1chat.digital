@@ -1,7 +1,12 @@
 const {
+  ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE,
+  ETAPA_RECUPERACAO_SENHA_ORIENTADO,
   MENSAGEM_RECUPERACAO_SENHA,
+  MENSAGEM_RECUPERACAO_SENHA_NOVO_TELEFONE_RECEBIDO,
   MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE,
   classificarRecuperacaoSenha,
+  criarContextoTrocaTelefoneRecuperacaoSenha,
+  extrairTelefoneInformado,
 } = require("./passwordRecovery");
 
 function registrarWebhookRoute({
@@ -185,6 +190,40 @@ function registrarWebhookRoute({
         return res.sendStatus(200);
       }
 
+      if (atendimento.etapa === ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE) {
+        const novoTelefone = extrairTelefoneInformado(mensagemTexto);
+        const contextoFila = criarContextoTrocaTelefoneRecuperacaoSenha(novoTelefone);
+
+        escreverLog(`RECUPERACAO SENHA | NOVO TELEFONE | ${numero}`);
+        await atualizarAtendimento(numero, {
+          modo: "bot",
+          etapa: "liberado",
+        });
+        await encaminharParaHumano(numero, contextoFila, {
+          mensagem: MENSAGEM_RECUPERACAO_SENHA_NOVO_TELEFONE_RECEBIDO,
+        });
+        return res.sendStatus(200);
+      }
+
+      if (atendimento.etapa === ETAPA_RECUPERACAO_SENHA_ORIENTADO) {
+        const tipoRecuperacaoSenhaOrientado =
+          classificarRecuperacaoSenha(mensagemNormalizada);
+
+        if (tipoRecuperacaoSenhaOrientado === "troca_telefone") {
+          escreverLog(`RECUPERACAO SENHA | PEDIU NOVO TELEFONE | ${numero}`);
+          await atualizarAtendimento(numero, {
+            modo: "bot",
+            etapa: ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE,
+          });
+          await enviarMensagem(numero, MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE);
+          return res.sendStatus(200);
+        }
+
+        await atualizarAtendimento(numero, { modo: "bot", etapa: "liberado" });
+        atendimento.modo = "bot";
+        atendimento.etapa = "liberado";
+      }
+
       if (atendimento.etapa === "inicio") {
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
         await enviarMensagem(numero, "Ola! Para iniciar o atendimento, informe apenas seu primeiro nome.");
@@ -277,15 +316,21 @@ function registrarWebhookRoute({
         classificarRecuperacaoSenha(mensagemNormalizada);
 
       if (tipoRecuperacaoSenha === "troca_telefone") {
-        escreverLog(`RECUPERACAO SENHA | TROCA TELEFONE | ${numero}`);
-        await encaminharParaHumano(numero, mensagemTexto, {
-          mensagem: MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE,
+        escreverLog(`RECUPERACAO SENHA | PEDIU NOVO TELEFONE | ${numero}`);
+        await atualizarAtendimento(numero, {
+          modo: "bot",
+          etapa: ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE,
         });
+        await enviarMensagem(numero, MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE);
         return res.sendStatus(200);
       }
 
       if (tipoRecuperacaoSenha === "recuperacao_senha") {
         escreverLog(`RECUPERACAO SENHA | ORIENTACAO | ${numero}`);
+        await atualizarAtendimento(numero, {
+          modo: "bot",
+          etapa: ETAPA_RECUPERACAO_SENHA_ORIENTADO,
+        });
         await enviarMensagem(numero, MENSAGEM_RECUPERACAO_SENHA);
         return res.sendStatus(200);
       }
