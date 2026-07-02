@@ -148,19 +148,19 @@ Prioridade: alta.
 
 ## BUG-009 - Restore ainda nao testado
 
-Status: aberto.
+Status: parcialmente mitigado.
 
 Impacto: backups podem nao restaurar sistema funcional.
 
 Risco: descobrir falha somente em desastre real.
 
-Evidencia: nao ha registro de restore completo testado.
+Evidencia: restore estrutural do backup `D:\1chat-backups\manual-quick-2026-07-02_01-04-08` foi testado em `D:\1chat-backups\restore-test-2026-07-02_01-04-08` em 2026-07-02. Resultado: aprovado com ressalva. `waha-data\` tinha 4109 arquivos; `waha-files\` existia, mas estava vazio. Nenhum servico foi iniciado e a producao nao foi tocada.
 
 Arquivos relacionados: `docs/disaster-recovery/RESTORE-CHECKLIST.md`.
 
-Como reproduzir: tentar restaurar em pasta/maquina limpa.
+Como reproduzir: tentar restaurar em pasta/maquina limpa e validar estrutura antes de iniciar servicos.
 
-Como corrigir: executar restore de teste e registrar resultado.
+Como corrigir: executar restore funcional em janela propria: subir WAHA a partir da pasta restaurada, validar reconexao WhatsApp, Cloudflare Tunnel, bot Railway consumindo WAHA restaurado e `pg_dump`/PostgreSQL.
 
 Prioridade: alta.
 

@@ -32,7 +32,7 @@
 - Credenciais no `docker-compose.yml` precisam ser migradas futuramente para `.env`.
 - `waha-data` precisa estar protegido contra commit.
 - Dump PostgreSQL ainda nao documentado/testado.
-- Restore ainda precisa ser testado.
+- Restore estrutural do backup rapido foi testado em pasta separada e aprovado com ressalva; restore funcional ainda precisa ser testado.
 
 ## Prioridade atual
 

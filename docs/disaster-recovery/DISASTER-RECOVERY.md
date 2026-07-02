@@ -119,6 +119,47 @@ Workspace atual onde estes documentos foram criados:
 - Deve parar WAHA de forma controlada, copiar `waha-data/` e subir WAHA novamente.
 - Deve ser aprovado especificamente antes de executar.
 
+## Restore testado
+
+- Data: 2026-07-02.
+- Backup testado: `D:\1chat-backups\manual-quick-2026-07-02_01-04-08`.
+- Restore testado em pasta separada: `D:\1chat-backups\restore-test-2026-07-02_01-04-08`.
+- Resultado: restore estrutural aprovado com ressalva.
+- Nenhum servico foi iniciado e a producao nao foi tocada.
+
+Itens criticos encontrados:
+
+- `START_HERE.md`.
+- `CHATGPT_PROJECT_CONTEXT.md`.
+- `.env`.
+- `.env.example`.
+- `.gitignore`.
+- `docker-compose.yml`.
+- `docker-compose.example.yml`.
+- `docs\`.
+- `scripts\`.
+- `bot\data\respostas.xlsx`.
+- `waha-data\`.
+- `waha-files\`.
+- Cloudflare `config.yml`.
+- `iniciar-1chat-producao.bat`.
+- `INVENTARIO.txt`.
+
+Ressalva:
+
+- `waha-data\` foi restaurado e nao estava vazio: 4109 arquivos.
+- `waha-files\` existia, mas estava vazio no backup/restore.
+- `waha-files\` vazio deve gerar alerta/ressalva, nao reprovacao automatica, porque pode ser pasta temporaria sem arquivos no momento do backup.
+
+Ainda nao testado:
+
+- Restore funcional.
+- Subir WAHA a partir da pasta restaurada.
+- Reconexao real do WhatsApp.
+- Cloudflare Tunnel usando restore.
+- Bot Railway consumindo WAHA restaurado.
+- `pg_dump`/PostgreSQL.
+
 ## Arquivos que nao devem ser publicados
 
 - `.env` e `*.env`.

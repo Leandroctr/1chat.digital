@@ -60,9 +60,21 @@ O modo implementado atualmente e backup rapido com WAHA rodando. Ele nao para WA
 - Inventario foi gerado?
 - `waha-data` foi copiado?
 - `waha-files` foi copiado?
+- `waha-files` existe? Registrar quantidade de arquivos; se estiver vazio, tratar como ressalva, nao falha critica automatica.
 - `bot/data/respostas.xlsx` esta presente?
 - `.env` privado e `docker-compose.yml` real estao presentes no backup privado?
 - Dump PostgreSQL existe, se aplicavel?
+
+## Restore estrutural registrado
+
+- Data: 2026-07-02.
+- Backup: `D:\1chat-backups\manual-quick-2026-07-02_01-04-08`.
+- Restore test: `D:\1chat-backups\restore-test-2026-07-02_01-04-08`.
+- Resultado: aprovado com ressalva.
+- `waha-data\`: restaurado e nao vazio, 4109 arquivos.
+- `waha-files\`: pasta existia, mas estava vazia.
+- Nenhum servico foi iniciado e a producao nao foi tocada.
+- Restore funcional ainda nao foi testado.
 
 ## Modos
 
