@@ -1,0 +1,23 @@
+services:
+  waha:
+    image: devlikeapro/waha-plus:latest
+    container_name: 1chat-waha
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: WEBJS
+
+      WAHA_API_KEY: ${WAHA_API_KEY}
+
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+
+      WHATSAPP_SWAGGER_USERNAME: ${WHATSAPP_SWAGGER_USERNAME}
+      WHATSAPP_SWAGGER_PASSWORD: ${WHATSAPP_SWAGGER_PASSWORD}
+
+    volumes:
+      - ./waha-data:/app/.sessions
+      - ./waha-files:/tmp/whatsapp-files
