@@ -6,7 +6,7 @@
 - Instalacao real: `C:\Users\User\1chat.digital`
 - Objetivo: chatbot WhatsApp com WAHA + Node/Express + PostgreSQL + painel admin.
 - WAHA: decisao estrategica, manter.
-- Hospedagem: local por decisao do dono.
+- Hospedagem: bot Node em producao no Railway; WAHA em Docker no PC local por decisao do dono.
 - Estado geral: MVP/producao inicial.
 
 ## Funcionando
@@ -18,12 +18,14 @@
 - Fila no painel.
 - Encerramento de atendimento.
 - Persistencia WAHA local em `waha-data`.
+- Cloudflare Tunnel expondo WAHA em `https://waha.1chat.digital`.
 
 ## Pontos criticos atuais
 
 - Estabilidade do PC/SSD em investigacao.
 - Backup externo ainda precisa ser implementado.
-- Divergencia de porta WAHA x bot precisa ser confirmada.
+- Arquitetura confirmada: Railway deve acessar WAHA por `https://waha.1chat.digital`; PC local usa WAHA em `http://localhost:3000`.
+- `localhost:3001` e referencia antiga/legada e nao deve ser usado como padrao atual.
 - Credenciais no `docker-compose.yml` precisam ser migradas futuramente para `.env`.
 - `waha-data` precisa estar protegido contra commit.
 - Dump PostgreSQL ainda nao documentado/testado.

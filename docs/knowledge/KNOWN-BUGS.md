@@ -4,17 +4,17 @@
 
 Status: aberto.
 
-Impacto: o bot espera WAHA em `http://localhost:3001`, mas o `docker-compose.yml` publica WAHA em `3000:3000`.
+Impacto: o fallback local do bot ainda aponta para `http://localhost:3001`, mas o WAHA real no PC local esta em `http://localhost:3000` e e exposto para producao por `https://waha.1chat.digital`.
 
-Risco: bot e WAHA podem nao se comunicar localmente; tambem pode haver conflito com o proprio bot, que usa `PORT=3000` por padrao.
+Risco: execucao local/dev do bot sem `WAHA_URL`/`WAHA_BASE_URL` pode tentar acessar a porta legada `3001`. Em producao Railway, o risco e baixo se `WAHA_URL` ou `WAHA_BASE_URL` estiver configurado como `https://waha.1chat.digital`.
 
-Evidencia: `bot/index.js` usa `WAHA_URL || WAHA_BASE_URL || "http://localhost:3001"`; `docker-compose.yml` usa `"3000:3000"`.
+Evidencia: `bot/index.js` usa `WAHA_URL || WAHA_BASE_URL || "http://localhost:3001"`; `docker-compose.yml` usa `"3000:3000"`; Cloudflare Tunnel aponta `waha.1chat.digital` para `http://localhost:3000`.
 
-Arquivos relacionados: `bot/index.js`, `bot/README.md`, `docker-compose.yml`.
+Arquivos relacionados: `bot/index.js`, `bot/README.md`, `.env.example`, `docker-compose.yml`, `C:\Users\User\.cloudflared\config.yml`, `.bat` de Startup do Windows.
 
 Como reproduzir: iniciar WAHA pelo compose atual e iniciar bot sem `WAHA_URL`; o bot tentara acessar WAHA em `localhost:3001`.
 
-Como corrigir: escolher um padrao. Opcoes: publicar WAHA em `3001:3000` ou definir `WAHA_URL=http://localhost:3000` no ambiente do bot.
+Como corrigir: manter Docker/WAHA em `localhost:3000`; definir `WAHA_URL`/`WAHA_BASE_URL` explicitamente no ambiente. Para Railway, usar `https://waha.1chat.digital`. Para execucao local no PC, usar `http://localhost:3000`. Tratar `localhost:3001` como legado ate decidir se o fallback do codigo sera ajustado.
 
 Prioridade: alta.
 

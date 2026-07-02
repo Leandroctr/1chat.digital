@@ -25,8 +25,8 @@ Valores locais padrao:
 
 ```env
 PORT=3000
-WAHA_BASE_URL=http://localhost:3001
-WAHA_API_KEY=123456
+WAHA_BASE_URL=http://localhost:3000
+WAHA_API_KEY=CHANGE_ME
 WAHA_SESSION=default
 ```
 
@@ -34,8 +34,8 @@ No Railway, configure pelo menos:
 
 ```env
 NODE_ENV=production
-WAHA_BASE_URL=https://sua-url-publica-do-waha
-WAHA_API_KEY=123456
+WAHA_BASE_URL=https://waha.1chat.digital
+WAHA_API_KEY=CHANGE_ME
 WAHA_SESSION=default
 ```
 
@@ -47,7 +47,9 @@ Pontos importantes:
 
 - O Node deve usar `process.env.PORT`.
 - O WAHA local nao sera acessivel pelo Railway usando `localhost`.
-- Para manter WAHA local, exponha o WAHA com um tunel seguro e use essa URL em `WAHA_BASE_URL`.
+- Em producao, o Railway deve acessar o WAHA por `https://waha.1chat.digital`.
+- O PC local expoe o WAHA pelo Cloudflare Tunnel, apontando para `http://localhost:3000`.
+- `http://localhost:3001` e referencia antiga/legada e nao deve ser usado como padrao atual.
 - `data/` e `logs/` gravam em disco local; em Railway, use volume para persistencia real.
 
 ## Nao versionar
