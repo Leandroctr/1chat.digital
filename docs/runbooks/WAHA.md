@@ -69,6 +69,7 @@ Arquivos/midia:
 - Credenciais em `docker-compose.yml`.
 - Divergencia de porta entre bot e WAHA.
 - WAHA desconectar e exigir QR Code.
+- Mudancas em Docker, WAHA, porta ou Cloudflare sem revisar o `.bat` de Startup.
 
 ## O que verificar
 
@@ -90,4 +91,5 @@ Arquivos/midia:
 - `docs/knowledge/DECISIONS.md`
 - `docs/knowledge/KNOWN-BUGS.md`
 - `docs/standards/PORTS.md`
+- `docs/runbooks/STARTUP.md`
 - `docs/disaster-recovery/PROJECT-INVENTORY.md`

@@ -19,6 +19,7 @@
 - Encerramento de atendimento.
 - Persistencia WAHA local em `waha-data`.
 - Cloudflare Tunnel expondo WAHA em `https://waha.1chat.digital`.
+- Startup do Windows religando Docker/WAHA e Cloudflare Tunnel no reboot.
 
 ## Pontos criticos atuais
 
@@ -26,6 +27,7 @@
 - Backup externo ainda precisa ser implementado.
 - Arquitetura confirmada: Railway deve acessar WAHA por `https://waha.1chat.digital`; PC local usa WAHA em `http://localhost:3000`.
 - `localhost:3001` e referencia antiga/legada e nao deve ser usado como padrao atual.
+- Qualquer mudanca em Docker, WAHA, porta, Cloudflare ou inicializacao deve revisar `docs/runbooks/STARTUP.md`.
 - Credenciais no `docker-compose.yml` precisam ser migradas futuramente para `.env`.
 - `waha-data` precisa estar protegido contra commit.
 - Dump PostgreSQL ainda nao documentado/testado.

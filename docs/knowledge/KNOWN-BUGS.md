@@ -16,6 +16,8 @@ Como reproduzir: iniciar WAHA pelo compose atual e iniciar bot sem `WAHA_URL`; o
 
 Como corrigir: manter Docker/WAHA em `localhost:3000`; definir `WAHA_URL`/`WAHA_BASE_URL` explicitamente no ambiente. Para Railway, usar `https://waha.1chat.digital`. Para execucao local no PC, usar `http://localhost:3000`. Tratar `localhost:3001` como legado ate decidir se o fallback do codigo sera ajustado.
 
+Atencao: qualquer correcao que altere Docker, WAHA, porta, Cloudflare ou inicializacao deve revisar `docs/runbooks/STARTUP.md`, porque o reboot do PC depende do `.bat` de Startup.
+
 Prioridade: alta.
 
 ## BUG-002 - Credenciais WAHA em `docker-compose.yml`
