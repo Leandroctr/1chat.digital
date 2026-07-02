@@ -1,3 +1,9 @@
+const {
+  MENSAGEM_RECUPERACAO_SENHA,
+  MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE,
+  classificarRecuperacaoSenha,
+} = require("./passwordRecovery");
+
 function registrarWebhookRoute({
   app,
   mensagensProcessadas,
@@ -264,6 +270,23 @@ function registrarWebhookRoute({
         await atualizarAtendimento(numero, { etapa: "aguardando_nome" });
         await enviarMensagem(numero, "Ola! Para iniciar o atendimento, informe apenas seu primeiro nome.");
         escreverLog(`ETAPA INVALIDA | PEDIU NOME | ${numero}`);
+        return res.sendStatus(200);
+      }
+
+      const tipoRecuperacaoSenha =
+        classificarRecuperacaoSenha(mensagemNormalizada);
+
+      if (tipoRecuperacaoSenha === "troca_telefone") {
+        escreverLog(`RECUPERACAO SENHA | TROCA TELEFONE | ${numero}`);
+        await encaminharParaHumano(numero, mensagemTexto, {
+          mensagem: MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE,
+        });
+        return res.sendStatus(200);
+      }
+
+      if (tipoRecuperacaoSenha === "recuperacao_senha") {
+        escreverLog(`RECUPERACAO SENHA | ORIENTACAO | ${numero}`);
+        await enviarMensagem(numero, MENSAGEM_RECUPERACAO_SENHA);
         return res.sendStatus(200);
       }
 
