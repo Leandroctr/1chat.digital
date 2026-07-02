@@ -2,6 +2,12 @@
 
 Documento principal para reconstruir o 1chat.digital em caso de perda total do SSD.
 
+Destino local padrao de backup:
+
+`D:\1chat-backups\`
+
+O drive D: e uma primeira camada local. Ele nao substitui copia em nuvem privada ou HD externo.
+
 ## Escopo deste inventario
 
 Inspecao realizada em 2026-07-01.
@@ -43,7 +49,8 @@ Workspace atual onde estes documentos foram criados:
    - Login admin: `/admin/login`.
 
 2. WAHA
-   - URL padrao local: `http://localhost:3001`.
+   - URL local atual: `http://localhost:3000`.
+   - URL publica atual: `https://waha.1chat.digital`.
    - Variaveis aceitas: `WAHA_URL` ou `WAHA_BASE_URL`.
    - Sessao padrao: `default`.
    - API key padrao no codigo: valor encontrado, mascarado como `***`.
@@ -91,8 +98,26 @@ Workspace atual onde estes documentos foram criados:
 - `bot/data/fila.json`.
 - `bot/data/final-message-log.json`, se existir.
 - Arquivos `.env`, guardados somente em backup privado.
+- `docker-compose.yml` real privado.
+- `C:\Users\User\.cloudflared\config.yml`.
+- `.bat` de Startup do Windows.
 - Dump PostgreSQL, se `DATABASE_URL` estiver em uso.
 - Pasta/volume WAHA com sessao WhatsApp.
+
+## Backup rapido atual
+
+- Script: `scripts/backup/backup-1chat.ps1`.
+- Destino: `D:\1chat-backups\manual-quick-YYYY-MM-DD_HH-mm-ss\`.
+- WAHA continua rodando.
+- `pg_dump` ainda nao e executado.
+- Risco: `waha-data/` pode estar em uso durante a copia.
+
+## Backup consistente futuro
+
+- PENDENTE.
+- Exige janela de manutencao.
+- Deve parar WAHA de forma controlada, copiar `waha-data/` e subir WAHA novamente.
+- Deve ser aprovado especificamente antes de executar.
 
 ## Arquivos que nao devem ser publicados
 

@@ -6,6 +6,7 @@
 - Instalar Git, Node.js 20 LTS, Docker Desktop e cliente PostgreSQL.
 - Restaurar acesso ao GitHub, Railway, Supabase, provedor de dominio e provedor de tunel, se houver.
 - Baixar backup mais recente para disco local.
+- Se disponivel, usar backup em `D:\1chat-backups\manual-quick-YYYY-MM-DD_HH-mm-ss\`.
 
 ## Codigo e dependencias
 
@@ -32,11 +33,16 @@
 - Restaurar `config.json`, `fila.json`, `atendimentos.json` e `final-message-log.json`, se aplicavel.
 - Restaurar dump PostgreSQL, se `DATABASE_URL` estiver em uso.
 - Restaurar `waha-data` ou volume Docker equivalente.
+- Restaurar `waha-files/`, se existir no backup.
+- Restaurar `docker-compose.yml` real privado e `.env` privado.
+- Restaurar `C:\Users\User\.cloudflared\config.yml`, se a maquina for a mesma topologia.
+- Restaurar o `.bat` de Startup do Windows, se o PC local continuar responsavel por WAHA/Cloudflare.
 
 ## WAHA
 
 - Recriar container WAHA com persistencia.
-- Confirmar porta `3001` ou ajustar `WAHA_URL`.
+- Confirmar WAHA local em `http://localhost:3000`.
+- Confirmar Cloudflare expondo `https://waha.1chat.digital`.
 - Confirmar API key.
 - Confirmar sessao WhatsApp.
 - Ler QR Code novamente somente se a sessao restaurada nao funcionar.

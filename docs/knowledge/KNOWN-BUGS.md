@@ -142,7 +142,7 @@ Arquivos relacionados: `scripts/backup/backup-1chat.ps1`.
 
 Como reproduzir: verificar Agendador de Tarefas/rotina de backup.
 
-Como corrigir: agendar backup, validar arquivo gerado e guardar fora do SSD.
+Como corrigir: agendar backup, validar arquivo gerado em `D:\1chat-backups\` e copiar tambem para nuvem privada ou HD externo.
 
 Prioridade: alta.
 
