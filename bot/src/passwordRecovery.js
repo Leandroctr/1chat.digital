@@ -2,7 +2,14 @@ const MENSAGEM_RECUPERACAO_SENHA =
   'Para recuperar sua senha, toque no botao "Recuperar senha" na tela de login do site.\n\nUse o mesmo WhatsApp cadastrado na conta para receber o codigo. Se voce nao tem mais acesso ao telefone cadastrado, avise aqui que vou encaminhar para um atendente.';
 
 const MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE =
-  "Entendi. Para troca de telefone na recuperacao de senha, vou encaminhar seu atendimento para um operador verificar com seguranca.";
+  "Entendi. Informe o novo telefone com DDD para eu encaminhar seu atendimento com contexto.";
+
+const MENSAGEM_RECUPERACAO_SENHA_NOVO_TELEFONE_RECEBIDO =
+  "Recebi o novo telefone. Encaminhei seu atendimento para um operador verificar com seguranca.";
+
+const ETAPA_RECUPERACAO_SENHA_ORIENTADO = "recuperacao_senha_orientado";
+const ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE =
+  "recuperacao_senha_aguardando_novo_telefone";
 
 const PADROES_RECUPERACAO_SENHA = [
   /\besqueci\b.*\bsenha\b/,
@@ -36,11 +43,16 @@ const PADROES_TROCA_TELEFONE = [
   /\bnao tenho\b.*\bacesso\b.*\btelefone\b/,
   /\bnao tenho\b.*\bacesso\b.*\bnumero\b/,
   /\bnao tenho\b.*\bacesso\b.*\bwhatsapp\b/,
+  /\bnao tenho\b.*\btelefone\b/,
+  /\bnao tenho\b.*\bnumero\b/,
+  /\bnao tenho\b.*\bwhatsapp\b/,
   /\bsem acesso\b.*\btelefone\b/,
   /\bsem acesso\b.*\bnumero\b/,
+  /\bsem acesso\b.*\bwhatsapp\b/,
   /\bperdi\b.*\bnumero\b/,
   /\bperdi\b.*\btelefone\b/,
   /\bperdi\b.*\bcelular\b/,
+  /\bperdi\b.*\bwhatsapp\b/,
 ];
 
 function corresponde(mensagemNormalizada, padroes) {
@@ -59,8 +71,25 @@ function classificarRecuperacaoSenha(mensagemNormalizada) {
   return null;
 }
 
+function extrairTelefoneInformado(mensagemTexto) {
+  return String(mensagemTexto || "").replace(/\s+/g, " ").trim();
+}
+
+function criarContextoTrocaTelefoneRecuperacaoSenha(novoTelefone) {
+  return [
+    "Recuperacao de senha - troca de telefone.",
+    "Cliente informou que nao tem mais acesso ao numero cadastrado.",
+    `Novo telefone informado: ${novoTelefone}.`,
+  ].join(" ");
+}
+
 module.exports = {
+  ETAPA_RECUPERACAO_SENHA_AGUARDANDO_NOVO_TELEFONE,
+  ETAPA_RECUPERACAO_SENHA_ORIENTADO,
   MENSAGEM_RECUPERACAO_SENHA,
+  MENSAGEM_RECUPERACAO_SENHA_NOVO_TELEFONE_RECEBIDO,
   MENSAGEM_RECUPERACAO_SENHA_TROCA_TELEFONE,
   classificarRecuperacaoSenha,
+  criarContextoTrocaTelefoneRecuperacaoSenha,
+  extrairTelefoneInformado,
 };
