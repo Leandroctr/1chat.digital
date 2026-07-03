@@ -16,6 +16,7 @@ const API_BASE_URL =
   "";
 let respostasCache = [];
 let imagemPreviewLocalUrl = "";
+let configAtual = { plataformas: [] };
 const METRICAS_GATILHO_LABELS = {
   senha: "Senha",
   saque: "Saque",
@@ -160,6 +161,7 @@ function mostrarSecao(secao) {
     atendimentos: document.getElementById("sectionAtendimentos"),
     mensagemFinal: document.getElementById("sectionMensagemFinal"),
     horarioAtendimento: document.getElementById("sectionHorarioAtendimento"),
+    plataformas: document.getElementById("sectionPlataformas"),
     metricas: document.getElementById("sectionMetricas"),
     respostas: document.getElementById("sectionRespostas"),
   };
@@ -208,6 +210,50 @@ function mostrarStatusImagem(texto, tipo = "info") {
 
   status.textContent = texto;
   status.className = `status-message ${tipo}`;
+}
+
+function mostrarStatusPlataforma(texto, tipo = "info") {
+  const status = document.getElementById("platformStatus");
+
+  if (!status) return;
+
+  status.textContent = texto;
+  status.className = `status-message ${tipo}`;
+}
+
+function gerarPlatformKey(valor) {
+  return String(valor || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/https?:\/\//g, "")
+    .replace(/\bwww\./g, "")
+    .replace(/[^\w\s.-]/g, " ")
+    .replace(/[_\s.-]+/g, "")
+    .trim()
+    .slice(0, 60);
+}
+
+function textoParaAliases(texto) {
+  return String(texto || "")
+    .split(/[\n;,|]/)
+    .map((alias) => alias.trim())
+    .filter(Boolean);
+}
+
+function aliasesParaTexto(aliases) {
+  return Array.isArray(aliases) ? aliases.join("\n") : "";
+}
+
+function limparFormularioPlataforma() {
+  const campos = ["platformKey", "platformName", "platformUrl", "platformAliases"];
+  campos.forEach((id) => {
+    const campo = document.getElementById(id);
+    if (campo) campo.value = "";
+  });
+
+  const ativo = document.getElementById("platformActive");
+  if (ativo) ativo.checked = true;
 }
 
 function atualizarPreviewImagemConversa(imageUrl) {
@@ -269,6 +315,10 @@ async function carregarConfig() {
   try {
     const response = await fetchAdmin(`${API_BASE_URL}/api/config`);
     const config = await response.json();
+    configAtual = {
+      ...config,
+      plataformas: Array.isArray(config.plataformas) ? config.plataformas : [],
+    };
 
     document.getElementById("mensagemFinalAtiva").checked =
       Boolean(config.mensagem_final_ativa);
@@ -289,15 +339,18 @@ async function carregarConfig() {
 
     atualizarPreviewImagem(config);
     atualizarPreviewConversa();
+    renderizarPlataformas();
     mostrarStatusConfig("");
     mostrarStatusHorario("");
     mostrarStatusImagem("");
+    mostrarStatusPlataforma("");
   } catch (error) {
     mostrarStatusConfig(
       "Não foi possível carregar a configuração.",
       "error"
     );
     mostrarStatusHorario("Nao foi possivel carregar o horario.", "error");
+    mostrarStatusPlataforma("Nao foi possivel carregar as plataformas.", "error");
   }
 }
 
@@ -322,6 +375,7 @@ async function salvarConfig(event) {
       document.getElementById("horarioHumanoDomingoInicio").value,
     horario_humano_domingo_fim:
       document.getElementById("horarioHumanoDomingoFim").value,
+    plataformas: configAtual.plataformas || [],
   };
 
   try {
@@ -339,6 +393,10 @@ async function salvarConfig(event) {
     }
 
     const configSalva = await response.json();
+    configAtual = {
+      ...configSalva,
+      plataformas: Array.isArray(configSalva.plataformas) ? configSalva.plataformas : [],
+    };
 
     document.getElementById("mensagemFinalAtiva").checked =
       Boolean(configSalva.mensagem_final_ativa);
@@ -372,6 +430,161 @@ async function salvarConfig(event) {
   } finally {
     definirCarregamento(botao, false);
   }
+}
+
+async function salvarConfigComPlataformas(callbackSucesso) {
+  const response = await fetchAdmin(`${API_BASE_URL}/api/config`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      mensagem_final_ativa:
+        document.getElementById("mensagemFinalAtiva").checked,
+      mensagem_final:
+        document.getElementById("mensagemFinal").value,
+      pergunta_confirmacao_final:
+        document.getElementById("perguntaConfirmacaoFinal").value,
+      delay_mensagem_final_segundos:
+        Number(document.getElementById("delayMensagemFinal").value),
+      horario_humano_segunda_sabado_inicio:
+        document.getElementById("horarioHumanoSegundaSabadoInicio").value,
+      horario_humano_segunda_sabado_fim:
+        document.getElementById("horarioHumanoSegundaSabadoFim").value,
+      horario_humano_domingo_inicio:
+        document.getElementById("horarioHumanoDomingoInicio").value,
+      horario_humano_domingo_fim:
+        document.getElementById("horarioHumanoDomingoFim").value,
+      plataformas: configAtual.plataformas || [],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel salvar plataformas.");
+  }
+
+  const configSalva = await response.json();
+  configAtual = {
+    ...configSalva,
+    plataformas: Array.isArray(configSalva.plataformas) ? configSalva.plataformas : [],
+  };
+  renderizarPlataformas();
+  if (callbackSucesso) callbackSucesso();
+}
+
+function lerPlataformaDoFormulario() {
+  const nome = document.getElementById("platformName")?.value.trim() || "";
+  const url = document.getElementById("platformUrl")?.value.trim() || "";
+  const keyInformada = document.getElementById("platformKey")?.value.trim() || "";
+  const key = gerarPlatformKey(keyInformada || nome || url);
+
+  return {
+    key,
+    name: nome,
+    url,
+    aliases: textoParaAliases(document.getElementById("platformAliases")?.value || ""),
+    active: document.getElementById("platformActive")?.checked !== false,
+  };
+}
+
+async function adicionarPlataforma(event) {
+  event.preventDefault();
+  const botao = event.submitter;
+  const plataforma = lerPlataformaDoFormulario();
+
+  if (!plataforma.key || !plataforma.name || !plataforma.url) {
+    mostrarStatusPlataforma("Informe chave, nome e link.", "error");
+    return;
+  }
+
+  configAtual.plataformas = (configAtual.plataformas || []).filter(
+    (item) => item.key !== plataforma.key
+  );
+  configAtual.plataformas.push(plataforma);
+
+  try {
+    definirCarregamento(botao, true);
+    await salvarConfigComPlataformas(() => {
+      limparFormularioPlataforma();
+      mostrarStatusPlataforma("Plataforma salva.", "success");
+      mostrarToast("Plataforma salva", "O catalogo interno foi atualizado.", "success");
+    });
+  } catch (error) {
+    mostrarStatusPlataforma("Nao foi possivel salvar a plataforma.", "error");
+    mostrarToast("Erro ao salvar", "Nao foi possivel atualizar o catalogo.", "error");
+  } finally {
+    definirCarregamento(botao, false);
+  }
+}
+
+function editarPlataforma(key) {
+  const plataforma = (configAtual.plataformas || []).find((item) => item.key === key);
+  if (!plataforma) return;
+
+  document.getElementById("platformKey").value = plataforma.key || "";
+  document.getElementById("platformName").value = plataforma.name || "";
+  document.getElementById("platformUrl").value = plataforma.url || "";
+  document.getElementById("platformAliases").value = aliasesParaTexto(plataforma.aliases);
+  document.getElementById("platformActive").checked = plataforma.active !== false;
+  mostrarStatusPlataforma("Edite os campos e salve para atualizar.", "info");
+}
+
+async function removerPlataforma(key) {
+  if (!confirm("Remover esta plataforma do catalogo interno?")) return;
+
+  configAtual.plataformas = (configAtual.plataformas || []).filter(
+    (item) => item.key !== key
+  );
+
+  try {
+    await salvarConfigComPlataformas(() => {
+      mostrarStatusPlataforma("Plataforma removida.", "success");
+      mostrarToast("Plataforma removida", "O catalogo interno foi atualizado.", "success");
+    });
+  } catch (error) {
+    mostrarStatusPlataforma("Nao foi possivel remover a plataforma.", "error");
+  }
+}
+
+async function alternarPlataforma(key, ativo) {
+  configAtual.plataformas = (configAtual.plataformas || []).map((item) =>
+    item.key === key ? { ...item, active: ativo } : item
+  );
+
+  try {
+    await salvarConfigComPlataformas(() => {
+      mostrarStatusPlataforma("Plataforma atualizada.", "success");
+    });
+  } catch (error) {
+    mostrarStatusPlataforma("Nao foi possivel atualizar a plataforma.", "error");
+  }
+}
+
+function renderizarPlataformas() {
+  const tbody = document.getElementById("platformsBody");
+  if (!tbody) return;
+
+  const plataformas = configAtual.plataformas || [];
+
+  if (!plataformas.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Nenhuma plataforma cadastrada.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = plataformas.map((item) => {
+    const aliases = aliasesParaTexto(item.aliases).replace(/\n/g, ", ");
+    const url = linkSeguro(item.url);
+    return `
+      <tr>
+        <td><input type="checkbox" ${item.active !== false ? "checked" : ""} onchange="alternarPlataforma('${escaparHtml(item.key)}', this.checked)" /></td>
+        <td>${escaparHtml(item.key)}</td>
+        <td>${escaparHtml(item.name)}</td>
+        <td>${url ? `<a class="video-link" href="${escaparHtml(url)}" target="_blank" rel="noopener">${escaparHtml(item.url)}</a>` : escaparHtml(item.url || "-")}</td>
+        <td>${escaparHtml(aliases || "-")}</td>
+        <td><div class="response-actions"><button class="icon-button" type="button" onclick="editarPlataforma('${escaparHtml(item.key)}')">Editar</button><button class="icon-button remove" type="button" onclick="removerPlataforma('${escaparHtml(item.key)}')">Remover</button></div></td>
+      </tr>
+    `;
+  }).join("");
 }
 
 async function enviarImagemMensagemFinal(botao) {

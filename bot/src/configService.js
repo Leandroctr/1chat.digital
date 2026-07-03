@@ -1,3 +1,5 @@
+const { normalizarCatalogoPlataformas } = require("./platformService");
+
 const CONFIG_PADRAO = {
   mensagem_final_ativa: false,
   mensagem_final: "",
@@ -11,6 +13,15 @@ const CONFIG_PADRAO = {
   final_message_image_path: "",
   final_message_image_mime: "",
   final_message_image_size: 0,
+  plataformas: [
+    {
+      key: "obapremios",
+      name: "Oba Prêmios",
+      url: "https://obapremios.com",
+      aliases: ["oba", "obá", "oba premios", "oba prêmio", "obapremios", "obapremios.com"],
+      active: true,
+    },
+  ],
 };
 
 function normalizarHorario(valor, fallback) {
@@ -30,6 +41,9 @@ function normalizarHorario(valor, fallback) {
 function normalizarConfig(config) {
   const delayInformado = Number(config?.delay_mensagem_final_segundos);
   const tamanhoImagem = Number(config?.final_message_image_size);
+  const plataformas = Object.prototype.hasOwnProperty.call(config || {}, "plataformas")
+    ? config.plataformas
+    : CONFIG_PADRAO.plataformas;
 
   return {
     ...CONFIG_PADRAO,
@@ -63,6 +77,7 @@ function normalizarConfig(config) {
     final_message_image_path: String(config?.final_message_image_path || ""),
     final_message_image_mime: String(config?.final_message_image_mime || ""),
     final_message_image_size: Number.isNaN(tamanhoImagem) ? 0 : tamanhoImagem,
+    plataformas: normalizarCatalogoPlataformas(plataformas, CONFIG_PADRAO.plataformas),
   };
 }
 
@@ -116,6 +131,7 @@ function criarConfigService({ USAR_POSTGRES, pool, ARQUIVO_CONFIG, carregarJson,
       "horario_humano_segunda_sabado_fim",
       "horario_humano_domingo_inicio",
       "horario_humano_domingo_fim",
+      "plataformas",
     ];
 
     for (const campo of camposPermitidos) {

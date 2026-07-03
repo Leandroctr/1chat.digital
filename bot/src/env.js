@@ -9,11 +9,14 @@ const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "finalmessageassets";
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SESSION_SECRET = process.env.SESSION_SECRET;
+const PLATFORM_CONFIRMATION_ENABLED =
+  String(process.env.PLATFORM_CONFIRMATION_ENABLED || "true").toLowerCase() !== "false";
 
 module.exports = {
   ADMIN_PASSWORD,
   ADMIN_USER,
   PORT,
+  PLATFORM_CONFIRMATION_ENABLED,
   SESSION,
   SESSION_SECRET,
   SUPABASE_BUCKET,

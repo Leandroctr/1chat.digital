@@ -25,6 +25,9 @@
         <button class="menu-item" type="button" data-section="horarioAtendimento" onclick="mostrarSecao('horarioAtendimento')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg><span>Horario humano</span>
         </button>
+        <button class="menu-item" type="button" data-section="plataformas" onclick="mostrarSecao('plataformas')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2 2.4 3 5.4 3 9s-1 6.6-3 9M12 3c-2 2.4-3 5.4-3 9s1 6.6 3 9"/></svg><span>Plataformas</span>
+        </button>
         <button class="menu-item" type="button" data-section="metricas" onclick="mostrarSecao('metricas')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9M12 19V5M19 19v-7"/></svg><span>Metricas</span>
         </button>
@@ -110,6 +113,29 @@
             </div>
             <div class="form-actions"><span id="horarioStatus" class="status-message"></span><button class="button primary" type="submit" data-loading-text="Salvando...">Salvar horario</button></div>
           </form>
+        </section>
+      </section>
+
+      <section id="sectionPlataformas" class="page-section">
+        <header class="page-header"><div><p class="kicker">IDENTIFICACAO INTERNA</p><h1>Plataformas</h1><span>Cadastre nomes, links e sinonimos usados somente pelo bot.</span></div></header>
+
+        <section class="surface editor-surface">
+          <div class="surface-header"><div><span class="surface-label">CATALOGO INTERNO</span><h2>Cadastro de plataformas</h2></div></div>
+          <form class="config-form" onsubmit="adicionarPlataforma(event)">
+            <div class="platform-form-grid">
+              <label class="field"><span>Chave interna</span><input id="platformKey" type="text" placeholder="obapremios" /></label>
+              <label class="field"><span>Nome</span><input id="platformName" type="text" placeholder="Oba Premios" /></label>
+              <label class="field"><span>Link oficial</span><input id="platformUrl" type="url" placeholder="https://obapremios.com" /></label>
+              <label class="field"><span>Sinonimos</span><textarea id="platformAliases" rows="4" placeholder="oba&#10;oba premios&#10;obapremios.com"></textarea></label>
+            </div>
+            <label class="switch-card compact-switch"><span><strong>Plataforma ativa</strong><small>Disponivel para identificacao interna.</small></span><input id="platformActive" type="checkbox" checked /><i></i></label>
+            <div class="form-actions"><span id="platformStatus" class="status-message"></span><button class="button primary" type="submit" data-loading-text="Salvando...">Salvar plataforma</button></div>
+          </form>
+        </section>
+
+        <section class="surface platform-surface">
+          <div class="surface-header"><div><span class="surface-label">REGISTROS</span><h2>Plataformas cadastradas</h2></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Ativa</th><th>Chave</th><th>Nome</th><th>Link</th><th>Sinonimos</th><th></th></tr></thead><tbody id="platformsBody"><tr><td colspan="6" class="empty">Carregando plataformas...</td></tr></tbody></table></div>
         </section>
       </section>
 

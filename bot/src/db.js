@@ -10,10 +10,28 @@ function criarDb({ USAR_POSTGRES, pool }) {
         nome TEXT,
         cpf TEXT,
         site TEXT,
+        platform_key TEXT,
+        platform_name TEXT,
+        platform_url TEXT,
+        platform_raw TEXT,
+        platform_confirmed BOOLEAN DEFAULT FALSE,
+        platform_candidate_key TEXT,
+        platform_attempts INTEGER DEFAULT 0,
         criado_em TIMESTAMPTZ DEFAULT NOW(),
         atualizado_em TIMESTAMPTZ DEFAULT NOW(),
         iniciado_em TIMESTAMPTZ
       );
+    `);
+
+    await pool.query(`
+      ALTER TABLE atendimentos
+        ADD COLUMN IF NOT EXISTS platform_key TEXT,
+        ADD COLUMN IF NOT EXISTS platform_name TEXT,
+        ADD COLUMN IF NOT EXISTS platform_url TEXT,
+        ADD COLUMN IF NOT EXISTS platform_raw TEXT,
+        ADD COLUMN IF NOT EXISTS platform_confirmed BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS platform_candidate_key TEXT,
+        ADD COLUMN IF NOT EXISTS platform_attempts INTEGER DEFAULT 0;
     `);
 
     await pool.query(`

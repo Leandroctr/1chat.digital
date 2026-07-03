@@ -7,6 +7,13 @@ function mapearAtendimento(row) {
     nome: row.nome,
     cpf: row.cpf,
     site: row.site,
+    platform_key: row.platform_key,
+    platform_name: row.platform_name,
+    platform_url: row.platform_url,
+    platform_raw: row.platform_raw,
+    platform_confirmed: Boolean(row.platform_confirmed),
+    platform_candidate_key: row.platform_candidate_key,
+    platform_attempts: Number(row.platform_attempts || 0),
     criadoEm: row.criado_em,
     atualizadoEm: row.atualizado_em,
     iniciadoEm: row.iniciado_em,
@@ -46,9 +53,14 @@ function criarAtendimentosService({
         for (const [numero, atendimento] of Object.entries(dados)) {
           await client.query(
             `INSERT INTO atendimentos
-              (numero, modo, etapa, nome, cpf, site, criado_em, atualizado_em, iniciado_em)
+              (
+                numero, modo, etapa, nome, cpf, site,
+                platform_key, platform_name, platform_url, platform_raw,
+                platform_confirmed, platform_candidate_key, platform_attempts,
+                criado_em, atualizado_em, iniciado_em
+              )
              VALUES
-              ($1, $2, $3, $4, $5, $6, COALESCE($7, NOW()), NOW(), $8)`,
+              ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14, NOW()), NOW(), $15)`,
             [
               numero,
               atendimento.modo || "bot",
@@ -56,6 +68,13 @@ function criarAtendimentosService({
               atendimento.nome || null,
               atendimento.cpf || null,
               atendimento.site || null,
+              atendimento.platform_key || null,
+              atendimento.platform_name || null,
+              atendimento.platform_url || null,
+              atendimento.platform_raw || null,
+              Boolean(atendimento.platform_confirmed),
+              atendimento.platform_candidate_key || null,
+              Number(atendimento.platform_attempts || 0),
               dataBanco(atendimento.criadoEm),
               dataBanco(atendimento.iniciadoEm),
             ]
@@ -99,6 +118,13 @@ function criarAtendimentosService({
         nome: null,
         cpf: null,
         site: null,
+        platform_key: null,
+        platform_name: null,
+        platform_url: null,
+        platform_raw: null,
+        platform_confirmed: false,
+        platform_candidate_key: null,
+        platform_attempts: 0,
         criadoEm: horarioAtual(),
         atualizadoEm: horarioAtual(),
       };
@@ -121,8 +147,15 @@ function criarAtendimentosService({
              nome = $4,
              cpf = $5,
              site = $6,
+             platform_key = $7,
+             platform_name = $8,
+             platform_url = $9,
+             platform_raw = $10,
+             platform_confirmed = $11,
+             platform_candidate_key = $12,
+             platform_attempts = $13,
              atualizado_em = NOW(),
-             iniciado_em = COALESCE($7, iniciado_em)
+             iniciado_em = COALESCE($14, iniciado_em)
          WHERE numero = $1
          RETURNING *`,
         [
@@ -132,6 +165,13 @@ function criarAtendimentosService({
           atendimento.nome || null,
           atendimento.cpf || null,
           atendimento.site || null,
+          atendimento.platform_key || null,
+          atendimento.platform_name || null,
+          atendimento.platform_url || null,
+          atendimento.platform_raw || null,
+          Boolean(atendimento.platform_confirmed),
+          atendimento.platform_candidate_key || null,
+          Number(atendimento.platform_attempts || 0),
           dataBanco(atendimento.iniciadoEm),
         ]
       );

@@ -62,9 +62,16 @@ const { registrarAdminRoutes } = require("./src/adminRoutes");
 const { registrarWebhookRoute } = require("./src/webhookRoute");
 const { configurarMiddlewares } = require("./src/appMiddleware");
 const {
+  identificarPlataforma,
+  montarMensagemConfirmacaoPlataforma,
+  respostaNaoPlataforma,
+  respostaSimPlataforma,
+} = require("./src/platformService");
+const {
   PORT,
   ADMIN_PASSWORD,
   ADMIN_USER,
+  PLATFORM_CONFIRMATION_ENABLED,
   SESSION,
   SESSION_SECRET,
   SUPABASE_BUCKET,
@@ -289,6 +296,12 @@ registrarWebhookRoute({
   PERGUNTA_VIDEO,
   iniciarFluxoPosResposta,
   perguntarIA,
+  carregarConfig,
+  identificarPlataforma,
+  montarMensagemConfirmacaoPlataforma,
+  PLATFORM_CONFIRMATION_ENABLED,
+  respostaNaoPlataforma,
+  respostaSimPlataforma,
 });
 
 async function start() {

@@ -37,6 +37,12 @@ function registrarWebhookRoute({
   PERGUNTA_VIDEO,
   iniciarFluxoPosResposta,
   perguntarIA,
+  carregarConfig,
+  identificarPlataforma,
+  montarMensagemConfirmacaoPlataforma,
+  PLATFORM_CONFIRMATION_ENABLED,
+  respostaNaoPlataforma,
+  respostaSimPlataforma,
 }) {
   const encerramentosRecentes = new Map();
   const TEMPO_BLOQUEIO_ENCERRAMENTO_MS = 5 * 60 * 1000;
@@ -57,6 +63,151 @@ function registrarWebhookRoute({
     }, TEMPO_BLOQUEIO_ENCERRAMENTO_MS);
 
     encerramentosRecentes.set(numero, timer);
+  }
+
+  async function buscarPlataformaPorKey(key) {
+    const config = await carregarConfig();
+    return (config.plataformas || []).find((plataforma) => plataforma.key === key) || null;
+  }
+
+  async function responderPlataformaLiberada(numero, atendimento) {
+    await enviarMensagem(
+      numero,
+      atendimento.nome
+        ? `Perfeito, ${primeiroNome(atendimento.nome)}. Agora me diga como posso ajudar.`
+        : "Perfeito. Agora me diga como posso ajudar."
+    );
+  }
+
+  async function salvarPlataformaSemConfirmacao(numero, mensagemTexto, atendimento) {
+    await atualizarAtendimento(numero, {
+      site: mensagemTexto,
+      platform_key: null,
+      platform_name: null,
+      platform_url: null,
+      platform_raw: mensagemTexto,
+      platform_confirmed: false,
+      platform_candidate_key: null,
+      platform_attempts: 0,
+      etapa: "liberado",
+    });
+
+    await responderPlataformaLiberada(numero, atendimento);
+    escreverLog(`PLATAFORMA NAO CONFIRMADA | ${numero} | ${mensagemTexto}`);
+  }
+
+  async function pedirEnderecoCompletoPlataforma(numero, mensagemTexto, tentativas) {
+    await atualizarAtendimento(numero, {
+      site: null,
+      platform_key: null,
+      platform_name: null,
+      platform_url: null,
+      platform_raw: mensagemTexto,
+      platform_confirmed: false,
+      platform_candidate_key: null,
+      platform_attempts: tentativas,
+      etapa: "aguardando_site_completo",
+    });
+
+    await enviarMensagem(
+      numero,
+      "Não consegui confirmar a plataforma com segurança.\n\nPor favor, envie o endereço completo do site ou app em que você está jogando."
+    );
+  }
+
+  async function pedirConfirmacaoPlataforma(numero, mensagemTexto, plataforma) {
+    await atualizarAtendimento(numero, {
+      site: null,
+      platform_key: null,
+      platform_name: null,
+      platform_url: null,
+      platform_raw: mensagemTexto,
+      platform_confirmed: false,
+      platform_candidate_key: plataforma.key,
+      platform_attempts: 0,
+      etapa: "confirmando_plataforma",
+    });
+
+    await enviarMensagem(numero, montarMensagemConfirmacaoPlataforma(plataforma));
+    escreverLog(`PLATAFORMA CANDIDATA | ${numero} | ${plataforma.key} | ${mensagemTexto}`);
+  }
+
+  async function processarEntradaPlataforma(numero, mensagemTexto, atendimento) {
+    if (!PLATFORM_CONFIRMATION_ENABLED) {
+      await atualizarAtendimento(numero, {
+        site: mensagemTexto,
+        etapa: "liberado",
+      });
+
+      await responderPlataformaLiberada(numero, atendimento);
+      escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+      return;
+    }
+
+    const config = await carregarConfig();
+    const resultado = identificarPlataforma(mensagemTexto, config.plataformas || []);
+
+    if (resultado.status === "forte") {
+      await pedirConfirmacaoPlataforma(numero, mensagemTexto, resultado.plataforma);
+      return;
+    }
+
+    const tentativas = Number(atendimento.platform_attempts || 0) + 1;
+
+    if (atendimento.etapa === "aguardando_site_completo" && tentativas >= 2) {
+      await salvarPlataformaSemConfirmacao(numero, mensagemTexto, atendimento);
+      return;
+    }
+
+    await pedirEnderecoCompletoPlataforma(numero, mensagemTexto, tentativas);
+    escreverLog(`PLATAFORMA SEM MATCH SEGURO | ${numero} | ${resultado.status} | ${mensagemTexto}`);
+  }
+
+  async function processarConfirmacaoPlataforma(numero, mensagemTexto, mensagemNormalizada, atendimento) {
+    if (!PLATFORM_CONFIRMATION_ENABLED) {
+      await processarEntradaPlataforma(numero, mensagemTexto, atendimento);
+      return;
+    }
+
+    const plataforma = await buscarPlataformaPorKey(atendimento.platform_candidate_key);
+
+    if (respostaSimPlataforma(mensagemNormalizada) && plataforma) {
+      await atualizarAtendimento(numero, {
+        site: `${plataforma.name} - ${plataforma.url}`,
+        platform_key: plataforma.key,
+        platform_name: plataforma.name,
+        platform_url: plataforma.url,
+        platform_confirmed: true,
+        platform_candidate_key: null,
+        platform_attempts: 0,
+        etapa: "liberado",
+      });
+
+      await responderPlataformaLiberada(numero, atendimento);
+      escreverLog(`PLATAFORMA CONFIRMADA | ${numero} | ${plataforma.key}`);
+      return;
+    }
+
+    if (respostaNaoPlataforma(mensagemNormalizada) || !plataforma) {
+      await atualizarAtendimento(numero, {
+        platform_key: null,
+        platform_name: null,
+        platform_url: null,
+        platform_confirmed: false,
+        platform_candidate_key: null,
+        platform_attempts: Number(atendimento.platform_attempts || 0) + 1,
+        etapa: "aguardando_site",
+      });
+
+      await enviarMensagem(
+        numero,
+        "Certo. Por favor, envie o nome ou o endereço completo da plataforma em que você está jogando."
+      );
+      escreverLog(`PLATAFORMA NEGADA | ${numero} | ${mensagemTexto}`);
+      return;
+    }
+
+    await enviarMensagem(numero, "Responda com 1 para Sim ou 2 para Não.");
   }
 
   app.post("/webhook", async (req, res) => {
@@ -282,19 +433,21 @@ function registrarWebhookRoute({
         return res.sendStatus(200);
       }
 
-      if (atendimento.etapa === "aguardando_site") {
-        await atualizarAtendimento(numero, {
-          site: mensagemTexto,
-          etapa: "liberado",
-        });
-
-        await enviarMensagem(
+      if (atendimento.etapa === "confirmando_plataforma") {
+        await processarConfirmacaoPlataforma(
           numero,
-          atendimento.nome
-            ? `Perfeito, ${primeiroNome(atendimento.nome)}. Agora me diga como posso ajudar.`
-            : "Perfeito. Agora me diga como posso ajudar."
+          mensagemTexto,
+          mensagemNormalizada,
+          atendimento
         );
-        escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+        return res.sendStatus(200);
+      }
+
+      if (
+        atendimento.etapa === "aguardando_site" ||
+        atendimento.etapa === "aguardando_site_completo"
+      ) {
+        await processarEntradaPlataforma(numero, mensagemTexto, atendimento);
         return res.sendStatus(200);
       }
 
