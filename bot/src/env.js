@@ -1,7 +1,10 @@
 const PORT = process.env.PORT || 3000;
 const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://localhost:3001";
 const WAHA_API_KEY = process.env.WAHA_API_KEY || "123456";
-const SESSION = process.env.WAHA_SESSION || "default";
+const SESSION =
+  !process.env.WAHA_SESSION || process.env.WAHA_SESSION === "default"
+    ? "JANDIRA"
+    : process.env.WAHA_SESSION;
 const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

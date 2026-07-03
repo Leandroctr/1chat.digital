@@ -87,14 +87,14 @@ function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION, escreverLog = consol
     };
   }
 
-  async function alternarTyping(numero, ativar) {
+  async function alternarTyping(numero, ativar, session = SESSION) {
     const endpoint = ativar ? "startTyping" : "stopTyping";
 
     try {
       await axios.post(
         `${WAHA_URL}/api/${endpoint}`,
         {
-          session: SESSION,
+          session,
           chatId: numero,
         },
         {
@@ -180,6 +180,7 @@ function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION, escreverLog = consol
   }
 
   async function enviarMensagem(numero, texto, opcoes = {}) {
+    const session = opcoes.session || SESSION;
     const humanizacao = calcularDelayHumanizado(
       numero,
       texto,
@@ -187,14 +188,14 @@ function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION, escreverLog = consol
     );
 
     try {
-      await alternarTyping(numero, true);
+      await alternarTyping(numero, true, session);
       logHumanize(`${humanizacao.log}=${humanizacao.delayMs}ms | numero=${numero}`);
       await esperar(humanizacao.delayMs);
 
       await axios.post(
         `${WAHA_URL}/api/sendText`,
         {
-          session: SESSION,
+          session,
           chatId: numero,
           text: texto,
         },
@@ -211,16 +212,18 @@ function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION, escreverLog = consol
     } catch (error) {
       throw criarErroWaha("sendText", error);
     } finally {
-      await alternarTyping(numero, false);
+      await alternarTyping(numero, false, session);
     }
   }
 
-  async function enviarImagem(numero, imageUrl) {
+  async function enviarImagem(numero, imageUrl, opcoes = {}) {
+    const session = opcoes.session || SESSION;
+
     try {
       await axios.post(
         `${WAHA_URL}/api/sendImage`,
         {
-          session: SESSION,
+          session,
           chatId: numero,
           file: {
             url: imageUrl,
