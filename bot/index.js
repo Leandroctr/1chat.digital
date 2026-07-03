@@ -30,6 +30,8 @@ const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://lo
 const WAHA_API_KEY = process.env.WAHA_API_KEY || "123456";
 const SESSION = process.env.WAHA_SESSION || "default";
 const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
+const PLATFORM_CONFIRMATION_ENABLED =
+  String(process.env.PLATFORM_CONFIRMATION_ENABLED || "true").toLowerCase() !== "false";
 
 const pool = USAR_POSTGRES
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -58,6 +60,15 @@ const CONFIG_PADRAO = {
   mensagem_final: "",
   delay_mensagem_final_segundos: 20,
   pergunta_confirmacao_final: "Te ajudo em algo mais?",
+  plataformas: [
+    {
+      key: "obapremios",
+      name: "Oba Prêmios",
+      url: "https://obapremios.com",
+      aliases: ["oba", "obá", "oba premios", "oba prêmio", "obapremios", "obapremios.com"],
+      active: true,
+    },
+  ],
 };
 
 function garantirPasta(caminho) {
@@ -87,6 +98,164 @@ function normalizarTexto(texto) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\w\s]/g, "")
     .trim();
+}
+
+function removerEsquemaUrl(texto) {
+  return String(texto || "")
+    .replace(/https?:\/\//gi, "")
+    .replace(/\bwww\./gi, "");
+}
+
+function normalizarTextoPlataforma(texto) {
+  return removerEsquemaUrl(texto)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[/?#].*$/g, "")
+    .replace(/[^\w.\s-]/g, " ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactarTextoPlataforma(texto) {
+  return normalizarTextoPlataforma(texto).replace(/[^\w]/g, "");
+}
+
+function gerarPlatformKey(valor) {
+  return compactarTextoPlataforma(valor).slice(0, 60);
+}
+
+function normalizarUrlPlataforma(url) {
+  const texto = String(url || "").trim();
+  if (!texto) return "";
+
+  if (/^https?:\/\//i.test(texto)) return texto;
+  return `https://${removerEsquemaUrl(texto)}`;
+}
+
+function dividirAliases(valor) {
+  if (Array.isArray(valor)) return valor;
+
+  return String(valor || "")
+    .split(/[\n;,|]/)
+    .map((alias) => alias.trim())
+    .filter(Boolean);
+}
+
+function normalizarPlataformaConfig(plataforma) {
+  const name = String(plataforma?.name || "").trim();
+  const url = normalizarUrlPlataforma(plataforma?.url);
+  const key = gerarPlatformKey(plataforma?.key || name || url);
+
+  if (!key || !name || !url) return null;
+
+  return {
+    key,
+    name,
+    url,
+    aliases: dividirAliases(plataforma?.aliases),
+    active: plataforma?.active !== false,
+  };
+}
+
+function normalizarCatalogoPlataformas(plataformas) {
+  const catalogo = Array.isArray(plataformas) ? plataformas : CONFIG_PADRAO.plataformas;
+  const porChave = new Map();
+
+  for (const plataforma of catalogo) {
+    const normalizada = normalizarPlataformaConfig(plataforma);
+    if (!normalizada) continue;
+    porChave.set(normalizada.key, normalizada);
+  }
+
+  return Array.from(porChave.values());
+}
+
+function termosDaPlataforma(plataforma) {
+  return [
+    plataforma.key,
+    plataforma.name,
+    plataforma.url,
+    removerEsquemaUrl(plataforma.url),
+    ...dividirAliases(plataforma.aliases),
+  ].filter(Boolean);
+}
+
+function classificarMatchPlataforma(texto, plataforma) {
+  const entrada = normalizarTextoPlataforma(texto);
+  const entradaCompacta = compactarTextoPlataforma(texto);
+  if (!entrada || !entradaCompacta) return null;
+
+  let encontrouFraco = false;
+
+  for (const termo of termosDaPlataforma(plataforma)) {
+    const termoNormalizado = normalizarTextoPlataforma(termo);
+    const termoCompacto = compactarTextoPlataforma(termo);
+    if (!termoNormalizado || !termoCompacto) continue;
+
+    if (entrada === termoNormalizado || entradaCompacta === termoCompacto) {
+      return "forte";
+    }
+
+    const entradaPareceDominio = entrada.includes(".");
+    const termoPareceDominio = termoNormalizado.includes(".");
+    if (
+      entradaPareceDominio &&
+      termoPareceDominio &&
+      (entrada === termoNormalizado || entrada.startsWith(`${termoNormalizado}/`))
+    ) {
+      return "forte";
+    }
+
+    if (
+      entradaCompacta.length >= 4 &&
+      termoCompacto.length >= 4 &&
+      (entradaCompacta.includes(termoCompacto) || termoCompacto.includes(entradaCompacta))
+    ) {
+      encontrouFraco = true;
+    }
+  }
+
+  return encontrouFraco ? "fraco" : null;
+}
+
+function identificarPlataforma(texto) {
+  const plataformas = carregarConfig().plataformas.filter((plataforma) => plataforma.active !== false);
+  const fortes = [];
+  const fracos = [];
+
+  for (const plataforma of plataformas) {
+    const classificacao = classificarMatchPlataforma(texto, plataforma);
+    if (classificacao === "forte") fortes.push(plataforma);
+    if (classificacao === "fraco") fracos.push(plataforma);
+  }
+
+  if (fortes.length === 1 && fracos.length === 0) {
+    return { status: "forte", plataforma: fortes[0] };
+  }
+
+  if (fortes.length > 0 || fracos.length > 1) {
+    return { status: "multiplo" };
+  }
+
+  if (fracos.length === 1) {
+    return { status: "fraco" };
+  }
+
+  return { status: "nenhum" };
+}
+
+function montarMensagemConfirmacaoPlataforma(plataforma) {
+  return `Você quis dizer esta plataforma?\n\n${plataforma.name}\n${plataforma.url}\n\nResponda:\n1 - Sim\n2 - Não`;
+}
+
+function respostaSimPlataforma(mensagemNormalizada) {
+  return ["1", "sim", "s", "isso", "correto", "certo"].includes(mensagemNormalizada);
+}
+
+function respostaNaoPlataforma(mensagemNormalizada) {
+  return ["2", "nao", "n", "não"].includes(mensagemNormalizada);
 }
 
 function dataAtual() {
@@ -136,10 +305,28 @@ async function initDb() {
       nome TEXT,
       cpf TEXT,
       site TEXT,
+      platform_key TEXT,
+      platform_name TEXT,
+      platform_url TEXT,
+      platform_raw TEXT,
+      platform_confirmed BOOLEAN DEFAULT FALSE,
+      platform_candidate_key TEXT,
+      platform_attempts INTEGER DEFAULT 0,
       criado_em TIMESTAMPTZ DEFAULT NOW(),
       atualizado_em TIMESTAMPTZ DEFAULT NOW(),
       iniciado_em TIMESTAMPTZ
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE atendimentos
+      ADD COLUMN IF NOT EXISTS platform_key TEXT,
+      ADD COLUMN IF NOT EXISTS platform_name TEXT,
+      ADD COLUMN IF NOT EXISTS platform_url TEXT,
+      ADD COLUMN IF NOT EXISTS platform_raw TEXT,
+      ADD COLUMN IF NOT EXISTS platform_confirmed BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS platform_candidate_key TEXT,
+      ADD COLUMN IF NOT EXISTS platform_attempts INTEGER DEFAULT 0;
   `);
 
   await pool.query(`
@@ -175,6 +362,13 @@ function mapearAtendimento(row) {
     nome: row.nome,
     cpf: row.cpf,
     site: row.site,
+    platform_key: row.platform_key,
+    platform_name: row.platform_name,
+    platform_url: row.platform_url,
+    platform_raw: row.platform_raw,
+    platform_confirmed: Boolean(row.platform_confirmed),
+    platform_candidate_key: row.platform_candidate_key,
+    platform_attempts: Number(row.platform_attempts || 0),
     criadoEm: row.criado_em,
     atualizadoEm: row.atualizado_em,
     iniciadoEm: row.iniciado_em,
@@ -290,9 +484,14 @@ async function salvarAtendimentos(dados) {
       for (const [numero, atendimento] of Object.entries(dados)) {
         await client.query(
           `INSERT INTO atendimentos
-            (numero, modo, etapa, nome, cpf, site, criado_em, atualizado_em, iniciado_em)
+            (
+              numero, modo, etapa, nome, cpf, site,
+              platform_key, platform_name, platform_url, platform_raw,
+              platform_confirmed, platform_candidate_key, platform_attempts,
+              criado_em, atualizado_em, iniciado_em
+            )
            VALUES
-            ($1, $2, $3, $4, $5, $6, COALESCE($7, NOW()), NOW(), $8)`,
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14, NOW()), NOW(), $15)`,
           [
             numero,
             atendimento.modo || "bot",
@@ -300,6 +499,13 @@ async function salvarAtendimentos(dados) {
             atendimento.nome || null,
             atendimento.cpf || null,
             atendimento.site || null,
+            atendimento.platform_key || null,
+            atendimento.platform_name || null,
+            atendimento.platform_url || null,
+            atendimento.platform_raw || null,
+            Boolean(atendimento.platform_confirmed),
+            atendimento.platform_candidate_key || null,
+            Number(atendimento.platform_attempts || 0),
             dataBanco(atendimento.criadoEm),
             dataBanco(atendimento.iniciadoEm),
           ]
@@ -343,6 +549,13 @@ async function obterOuCriarAtendimento(numero) {
       nome: null,
       cpf: null,
       site: null,
+      platform_key: null,
+      platform_name: null,
+      platform_url: null,
+      platform_raw: null,
+      platform_confirmed: false,
+      platform_candidate_key: null,
+      platform_attempts: 0,
       criadoEm: horarioAtual(),
       atualizadoEm: horarioAtual(),
     };
@@ -365,8 +578,15 @@ async function atualizarAtendimento(numero, novosDados) {
            nome = $4,
            cpf = $5,
            site = $6,
+           platform_key = $7,
+           platform_name = $8,
+           platform_url = $9,
+           platform_raw = $10,
+           platform_confirmed = $11,
+           platform_candidate_key = $12,
+           platform_attempts = $13,
            atualizado_em = NOW(),
-           iniciado_em = COALESCE($7, iniciado_em)
+           iniciado_em = COALESCE($14, iniciado_em)
        WHERE numero = $1
        RETURNING *`,
       [
@@ -376,6 +596,13 @@ async function atualizarAtendimento(numero, novosDados) {
         atendimento.nome || null,
         atendimento.cpf || null,
         atendimento.site || null,
+        atendimento.platform_key || null,
+        atendimento.platform_name || null,
+        atendimento.platform_url || null,
+        atendimento.platform_raw || null,
+        Boolean(atendimento.platform_confirmed),
+        atendimento.platform_candidate_key || null,
+        Number(atendimento.platform_attempts || 0),
         dataBanco(atendimento.iniciadoEm),
       ]
     );
@@ -554,6 +781,9 @@ async function enviarMensagem(numero, texto) {
 
 function normalizarConfig(config) {
   const delayInformado = Number(config?.delay_mensagem_final_segundos);
+  const plataformas = Object.prototype.hasOwnProperty.call(config || {}, "plataformas")
+    ? config.plataformas
+    : CONFIG_PADRAO.plataformas;
 
   return {
     ...CONFIG_PADRAO,
@@ -570,6 +800,8 @@ function normalizarConfig(config) {
         ? CONFIG_PADRAO.delay_mensagem_final_segundos
         : delayInformado
     ),
+    plataformas: normalizarCatalogoPlataformas(plataformas),
+    platform_confirmation_enabled: PLATFORM_CONFIRMATION_ENABLED,
   };
 }
 
@@ -585,6 +817,7 @@ function salvarConfig(config) {
     "mensagem_final",
     "delay_mensagem_final_segundos",
     "pergunta_confirmacao_final",
+    "plataformas",
   ];
 
   for (const campo of camposPermitidos) {
@@ -746,6 +979,141 @@ async function encaminharParaHumano(numero, mensagemTexto) {
   await ativarModoHumano(numero);
   await adicionarNaFila(numero, mensagemTexto);
   escreverLog(`ENCAMINHADO HUMANO | ${numero}`);
+}
+
+function buscarPlataformaPorKey(key) {
+  return carregarConfig().plataformas.find((plataforma) => plataforma.key === key) || null;
+}
+
+async function salvarPlataformaSemConfirmacao(numero, mensagemTexto) {
+  await atualizarAtendimento(numero, {
+    site: mensagemTexto,
+    platform_key: null,
+    platform_name: null,
+    platform_url: null,
+    platform_raw: mensagemTexto,
+    platform_confirmed: false,
+    platform_candidate_key: null,
+    platform_attempts: 0,
+    etapa: "liberado",
+  });
+
+  await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
+  escreverLog(`PLATAFORMA NAO CONFIRMADA | ${numero} | ${mensagemTexto}`);
+}
+
+async function pedirEnderecoCompletoPlataforma(numero, mensagemTexto, tentativas) {
+  await atualizarAtendimento(numero, {
+    site: null,
+    platform_key: null,
+    platform_name: null,
+    platform_url: null,
+    platform_raw: mensagemTexto,
+    platform_confirmed: false,
+    platform_candidate_key: null,
+    platform_attempts: tentativas,
+    etapa: "aguardando_site_completo",
+  });
+
+  await enviarMensagem(
+    numero,
+    "Não consegui confirmar a plataforma com segurança.\n\nPor favor, envie o endereço completo do site ou app em que você está jogando."
+  );
+}
+
+async function pedirConfirmacaoPlataforma(numero, mensagemTexto, plataforma) {
+  await atualizarAtendimento(numero, {
+    site: null,
+    platform_key: null,
+    platform_name: null,
+    platform_url: null,
+    platform_raw: mensagemTexto,
+    platform_confirmed: false,
+    platform_candidate_key: plataforma.key,
+    platform_attempts: 0,
+    etapa: "confirmando_plataforma",
+  });
+
+  await enviarMensagem(numero, montarMensagemConfirmacaoPlataforma(plataforma));
+  escreverLog(`PLATAFORMA CANDIDATA | ${numero} | ${plataforma.key} | ${mensagemTexto}`);
+}
+
+async function processarEntradaPlataforma(numero, mensagemTexto, atendimento) {
+  if (!PLATFORM_CONFIRMATION_ENABLED) {
+    await atualizarAtendimento(numero, {
+      site: mensagemTexto,
+      etapa: "liberado",
+    });
+
+    await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
+    escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+    return true;
+  }
+
+  const resultado = identificarPlataforma(mensagemTexto);
+
+  if (resultado.status === "forte") {
+    await pedirConfirmacaoPlataforma(numero, mensagemTexto, resultado.plataforma);
+    return true;
+  }
+
+  const tentativas = Number(atendimento.platform_attempts || 0) + 1;
+
+  if (atendimento.etapa === "aguardando_site_completo" && tentativas >= 2) {
+    await salvarPlataformaSemConfirmacao(numero, mensagemTexto);
+    return true;
+  }
+
+  await pedirEnderecoCompletoPlataforma(numero, mensagemTexto, tentativas);
+  escreverLog(`PLATAFORMA SEM MATCH SEGURO | ${numero} | ${resultado.status} | ${mensagemTexto}`);
+  return true;
+}
+
+async function processarConfirmacaoPlataforma(numero, mensagemTexto, mensagemNormalizada, atendimento) {
+  if (!PLATFORM_CONFIRMATION_ENABLED) {
+    return processarEntradaPlataforma(numero, mensagemTexto, atendimento);
+  }
+
+  const plataforma = buscarPlataformaPorKey(atendimento.platform_candidate_key);
+
+  if (respostaSimPlataforma(mensagemNormalizada) && plataforma) {
+    await atualizarAtendimento(numero, {
+      site: `${plataforma.name} - ${plataforma.url}`,
+      platform_key: plataforma.key,
+      platform_name: plataforma.name,
+      platform_url: plataforma.url,
+      platform_confirmed: true,
+      platform_candidate_key: null,
+      platform_attempts: 0,
+      etapa: "liberado",
+    });
+
+    await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
+    escreverLog(`PLATAFORMA CONFIRMADA | ${numero} | ${plataforma.key}`);
+    return true;
+  }
+
+  if (respostaNaoPlataforma(mensagemNormalizada) || !plataforma) {
+    await atualizarAtendimento(numero, {
+      platform_key: null,
+      platform_name: null,
+      platform_url: null,
+      platform_confirmed: false,
+      platform_candidate_key: null,
+      platform_attempts: Number(atendimento.platform_attempts || 0) + 1,
+      etapa: "aguardando_site",
+    });
+
+    await enviarMensagem(
+      numero,
+      "Certo. Por favor, envie o nome ou o endereço completo da plataforma em que você está jogando."
+    );
+    escreverLog(`PLATAFORMA NEGADA | ${numero} | ${mensagemTexto}`);
+    return true;
+  }
+
+  await enviarMensagem(numero, "Responda com 1 para Sim ou 2 para Não.");
+  return true;
 }
 
 async function iniciarFluxoRecuperacaoSenha(numero) {
@@ -988,14 +1356,21 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (atendimento.etapa === "aguardando_site") {
-      await atualizarAtendimento(numero, {
-        site: mensagemTexto,
-        etapa: "liberado",
-      });
+    if (atendimento.etapa === "confirmando_plataforma") {
+      await processarConfirmacaoPlataforma(
+        numero,
+        mensagemTexto,
+        mensagemNormalizada,
+        atendimento
+      );
+      return res.sendStatus(200);
+    }
 
-      await enviarMensagem(numero, "Perfeito. Agora me diga como posso ajudar.");
-      escreverLog(`SITE SALVO | ${numero} | ${mensagemTexto}`);
+    if (
+      atendimento.etapa === "aguardando_site" ||
+      atendimento.etapa === "aguardando_site_completo"
+    ) {
+      await processarEntradaPlataforma(numero, mensagemTexto, atendimento);
       return res.sendStatus(200);
     }
 

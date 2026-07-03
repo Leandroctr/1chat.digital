@@ -20,6 +20,7 @@
       <nav>
         <a class="active">Fila</a>
         <a>Atendimentos</a>
+        <a>Plataformas</a>
         <a>Perguntas</a>
         <a>Relatórios</a>
         <a>Logs</a>
@@ -104,6 +105,69 @@
             <span id="configStatus" class="status-message"></span>
           </div>
         </form>
+      </section>
+
+      <section class="panel config-panel">
+        <div class="panel-header">
+          <div>
+            <h3>Plataformas</h3>
+            <p>Cadastre nomes, links e sinônimos usados apenas na identificação interna do bot.</p>
+          </div>
+        </div>
+
+        <form class="config-form" onsubmit="adicionarPlataforma(event)">
+          <div class="config-grid platform-form-grid">
+            <label>
+              <span>Chave interna</span>
+              <input id="platformKey" type="text" placeholder="obapremios" />
+            </label>
+
+            <label>
+              <span>Nome</span>
+              <input id="platformName" type="text" placeholder="Oba Prêmios" />
+            </label>
+
+            <label>
+              <span>Link oficial</span>
+              <input id="platformUrl" type="url" placeholder="https://obapremios.com" />
+            </label>
+
+            <label>
+              <span>Sinônimos</span>
+              <textarea id="platformAliases" rows="3" placeholder="oba&#10;oba premios&#10;obapremios.com"></textarea>
+            </label>
+          </div>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="platformActive" checked />
+            <span>Plataforma ativa</span>
+          </label>
+
+          <div class="config-actions">
+            <button class="primary" type="submit">Adicionar plataforma</button>
+            <span id="platformStatus" class="status-message"></span>
+          </div>
+        </form>
+
+        <div class="table-wrap platform-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ativa</th>
+                <th>Chave</th>
+                <th>Nome</th>
+                <th>Link</th>
+                <th>Sinônimos</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="platformsBody">
+              <tr>
+                <td colspan="6" class="empty">Carregando plataformas...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="panel">

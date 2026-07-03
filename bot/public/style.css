@@ -139,6 +139,16 @@ nav a:hover {
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
 }
 
+.secondary {
+  border: 0;
+  background: #e0f2fe;
+  color: #075985;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -256,6 +266,10 @@ nav a:hover {
   gap: 18px;
 }
 
+.platform-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .config-actions {
   display: flex;
   align-items: center;
@@ -278,6 +292,10 @@ nav a:hover {
 
 .table-wrap {
   overflow-x: auto;
+}
+
+.platform-table-wrap {
+  border-top: 1px solid var(--line);
 }
 
 table {
@@ -340,6 +358,18 @@ td {
 .danger:hover {
   background: var(--red);
   color: white;
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+td a {
+  color: var(--blue);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .empty {
