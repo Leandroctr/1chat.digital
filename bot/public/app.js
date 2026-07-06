@@ -108,11 +108,22 @@ function aplicarStatusWaha(status) {
   const integracaoCard = document.getElementById("integracaoStatusCard");
   const integracaoLabel = document.getElementById("integracaoStatusLabel");
   const integracaoDetail = document.getElementById("integracaoStatusDetail");
-  const estado = String(status?.status || "UNKNOWN").toUpperCase();
-  const isWorking = Boolean(status?.isWorking || estado === "WORKING");
+  const systemStatus = status?.systemStatus || status || {};
+  const sessionStatus = status?.wahaSession || {};
+  const sistemaEstado = String(systemStatus?.status || "unknown").toLowerCase();
+  const estado = String(sessionStatus.status || "UNKNOWN").toUpperCase();
+  const isWorking = Boolean(sessionStatus.isWorking || estado === "WORKING");
   const isWarning = ["SCAN_QR_CODE", "STARTING"].includes(estado);
+  const sistemaClasse =
+    sistemaEstado === "operational"
+      ? "status-ok"
+      : sistemaEstado === "auth_error"
+        ? "status-warning"
+        : sistemaEstado === "offline"
+          ? "status-error"
+          : "status-checking";
 
-  const classe =
+  const sessaoClasse =
     isWorking
       ? "status-ok"
       : isWarning
@@ -130,31 +141,57 @@ function aplicarStatusWaha(status) {
 
   serviceCard?.classList.remove(...classes);
   integracaoCard?.classList.remove(...classes);
-  serviceCard?.classList.add(classe);
-  integracaoCard?.classList.add(classe);
+  serviceCard?.classList.add(sessaoClasse);
+  integracaoCard?.classList.add(sistemaClasse);
 
-  const mensagens = {
-    WORKING: "WhatsApp conectado e pronto.",
-    SCAN_QR_CODE: "Sessao precisa de QR Code.",
-    STOPPED: "Sessao parada. O bot pode nao responder.",
-    FAILED: "Erro na sessao.",
-    STARTING: "Sessao iniciando.",
-    UNKNOWN: "Nao foi possivel consultar o WAHA.",
+  const labels = {
+    WORKING: "Conectado",
+    SCAN_QR_CODE: "QR Code necessario",
+    STOPPED: "Parado",
+    FAILED: "Erro",
+    STARTING: "Iniciando",
+    UNKNOWN: "Indisponivel",
   };
-  const label = status?.label || (isWorking ? "WhatsApp conectado" : "WhatsApp requer atencao");
-  const detail = status?.detail || mensagens[estado] || mensagens.UNKNOWN;
-  const action = status?.action || (isWorking ? "Operacional" : estado);
-  const horario = status?.checkedAt
-    ? new Date(status.checkedAt).toLocaleTimeString("pt-BR", {
+  const disponibilidadeSessao = {
+    WORKING: "Operacional",
+    SCAN_QR_CODE: "Atencao",
+    STARTING: "Atencao",
+    STOPPED: "Indisponivel",
+    FAILED: "Indisponivel",
+    UNKNOWN: "Indeterminado",
+  };
+  const integracaoStatus = {
+    operational: {
+      label: "Operando",
+      detail: "Cloudflare Tunnel ativo e API acessivel.",
+    },
+    auth_error: {
+      label: "Atencao",
+      detail: "API acessivel, mas autenticacao falhou.",
+    },
+    offline: {
+      label: "Offline",
+      detail: "Integracao indisponivel.",
+    },
+    unknown: {
+      label: "Indisponivel",
+      detail: "Nao foi possivel verificar a integracao.",
+    },
+  };
+  const integracao = integracaoStatus[sistemaEstado] || integracaoStatus.unknown;
+  const detail = sessionStatus.detail || `Sessao default: ${labels[estado] || labels.UNKNOWN}`;
+  const action = disponibilidadeSessao[estado] || disponibilidadeSessao.UNKNOWN;
+  const horario = sessionStatus.checkedAt
+    ? new Date(sessionStatus.checkedAt).toLocaleTimeString("pt-BR", {
         hour: "2-digit",
         minute: "2-digit",
       })
     : "--:--";
 
-  if (serviceLabel) serviceLabel.textContent = label;
+  if (serviceLabel) serviceLabel.textContent = "Status WhatsApp";
   if (serviceDetail) serviceDetail.textContent = detail;
-  if (serviceAction) serviceAction.textContent = action.replace("Disponibilidade ", "");
-  if (sessionName) sessionName.textContent = status?.session || "default";
+  if (serviceAction) serviceAction.textContent = action;
+  if (sessionName) sessionName.textContent = sessionStatus.session || "default";
   if (checkedAt) checkedAt.textContent = horario;
   if (sessionBadge) {
     sessionBadge.classList.remove(...badgeClasses);
@@ -167,13 +204,13 @@ function aplicarStatusWaha(status) {
             ? "status-unknown"
             : "status-error"
     );
-    sessionBadge.textContent = estado;
+    sessionBadge.textContent = estado === "WORKING" ? "WORKING" : labels[estado] || labels.UNKNOWN;
   }
   if (integracaoLabel) {
-    integracaoLabel.textContent = isWorking ? "WORKING" : estado;
+    integracaoLabel.textContent = integracao.label;
   }
   if (integracaoDetail) {
-    integracaoDetail.textContent = detail;
+    integracaoDetail.textContent = integracao.detail;
   }
 }
 
@@ -185,13 +222,18 @@ async function carregarStatusWaha() {
   } catch (error) {
     aplicarStatusWaha({
       ok: false,
-      session: "default",
-      status: "UNKNOWN",
-      isWorking: false,
-      label: "Status desconhecido",
-      detail: "Nao foi possivel consultar o WAHA.",
-      action: "Indisponivel",
+      status: "offline",
+      label: "WAHA desconectado",
+      detail: "Tunnel/WAHA indisponivel",
+      action: "Disponibilidade Offline",
       checkedAt: new Date().toISOString(),
+      wahaSession: {
+        session: "default",
+        status: "UNKNOWN",
+        isWorking: false,
+        label: "Indisponivel",
+        detail: "Nao foi possivel consultar a sessao WAHA.",
+      },
     });
   }
 }
