@@ -102,41 +102,78 @@ function aplicarStatusWaha(status) {
   const serviceLabel = document.getElementById("wahaStatusLabel");
   const serviceDetail = document.getElementById("wahaStatusDetail");
   const serviceAction = document.getElementById("wahaStatusAction");
+  const sessionName = document.getElementById("wahaSessionName");
+  const sessionBadge = document.getElementById("wahaSessionBadge");
+  const checkedAt = document.getElementById("wahaCheckedAt");
   const integracaoCard = document.getElementById("integracaoStatusCard");
   const integracaoLabel = document.getElementById("integracaoStatusLabel");
   const integracaoDetail = document.getElementById("integracaoStatusDetail");
+  const estado = String(status?.status || "UNKNOWN").toUpperCase();
+  const isWorking = Boolean(status?.isWorking || estado === "WORKING");
+  const isWarning = ["SCAN_QR_CODE", "STARTING"].includes(estado);
 
   const classe =
-    status?.status === "operational"
+    isWorking
       ? "status-ok"
-      : status?.status === "auth_error"
+      : isWarning
         ? "status-warning"
-        : "status-error";
+        : estado === "UNKNOWN"
+          ? "status-checking"
+          : "status-error";
   const classes = ["status-ok", "status-warning", "status-error", "status-checking"];
+  const badgeClasses = [
+    "status-working",
+    "status-warning",
+    "status-error",
+    "status-unknown",
+  ];
 
   serviceCard?.classList.remove(...classes);
   integracaoCard?.classList.remove(...classes);
   serviceCard?.classList.add(classe);
   integracaoCard?.classList.add(classe);
 
-  const label = status?.label || "WAHA desconectado";
-  const detail = status?.detail || "Tunnel/WAHA indisponivel";
-  const action = status?.action || "Disponibilidade Offline";
+  const mensagens = {
+    WORKING: "WhatsApp conectado e pronto.",
+    SCAN_QR_CODE: "Sessao precisa de QR Code.",
+    STOPPED: "Sessao parada. O bot pode nao responder.",
+    FAILED: "Erro na sessao.",
+    STARTING: "Sessao iniciando.",
+    UNKNOWN: "Nao foi possivel consultar o WAHA.",
+  };
+  const label = status?.label || (isWorking ? "WhatsApp conectado" : "WhatsApp requer atencao");
+  const detail = status?.detail || mensagens[estado] || mensagens.UNKNOWN;
+  const action = status?.action || (isWorking ? "Operacional" : estado);
+  const horario = status?.checkedAt
+    ? new Date(status.checkedAt).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--:--";
 
   if (serviceLabel) serviceLabel.textContent = label;
   if (serviceDetail) serviceDetail.textContent = detail;
   if (serviceAction) serviceAction.textContent = action.replace("Disponibilidade ", "");
+  if (sessionName) sessionName.textContent = status?.session || "default";
+  if (checkedAt) checkedAt.textContent = horario;
+  if (sessionBadge) {
+    sessionBadge.classList.remove(...badgeClasses);
+    sessionBadge.classList.add(
+      isWorking
+        ? "status-working"
+        : isWarning
+          ? "status-warning"
+          : estado === "UNKNOWN"
+            ? "status-unknown"
+            : "status-error"
+    );
+    sessionBadge.textContent = estado;
+  }
   if (integracaoLabel) {
-    integracaoLabel.textContent =
-      status?.status === "operational"
-        ? "Online"
-        : status?.status === "auth_error"
-          ? "Auth"
-          : "Offline";
+    integracaoLabel.textContent = isWorking ? "WORKING" : estado;
   }
   if (integracaoDetail) {
-    integracaoDetail.textContent =
-      status?.status === "auth_error" ? "Verificar WAHA_API_KEY" : detail;
+    integracaoDetail.textContent = detail;
   }
 }
 
@@ -148,10 +185,13 @@ async function carregarStatusWaha() {
   } catch (error) {
     aplicarStatusWaha({
       ok: false,
-      status: "offline",
-      label: "WAHA desconectado",
-      detail: "Tunnel/WAHA indisponivel",
-      action: "Disponibilidade Offline",
+      session: "default",
+      status: "UNKNOWN",
+      isWorking: false,
+      label: "Status desconhecido",
+      detail: "Nao foi possivel consultar o WAHA.",
+      action: "Indisponivel",
+      checkedAt: new Date().toISOString(),
     });
   }
 }

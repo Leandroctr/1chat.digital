@@ -113,70 +113,64 @@ function criarWahaClient({ WAHA_URL, WAHA_API_KEY, SESSION, escreverLog = consol
 
   async function obterStatus() {
     const checkedAt = new Date().toISOString();
-    const endpoints = ["/api/server/status", "/api/version"];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await axios.get(`${WAHA_URL}${endpoint}`, {
-          headers: { "X-Api-Key": WAHA_API_KEY },
-          timeout: 4000,
-          validateStatus: () => true,
-        });
-
-        if (response.status === 401) {
-          return {
-            ok: false,
-            status: "auth_error",
-            label: "WAHA inacessivel",
-            detail: "Erro de autenticacao",
-            action: "Verificar WAHA_API_KEY",
-            checkedAt,
-          };
-        }
-
-        if (response.status >= 200 && response.status < 300) {
-          return {
-            ok: true,
-            status: "operational",
-            label: "WAHA conectado",
-            detail: "Tunnel ativo",
-            action: "Disponibilidade Operacional",
-            checkedAt,
-          };
-        }
-
-        if (response.status === 404 && endpoint !== endpoints[endpoints.length - 1]) {
-          continue;
-        }
-
-        return {
-          ok: false,
-          status: "offline",
-          label: "WAHA desconectado",
-          detail: "Tunnel/WAHA indisponivel",
-          action: "Disponibilidade Offline",
-          checkedAt,
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          status: "offline",
-          label: "WAHA desconectado",
-          detail: "Tunnel/WAHA indisponivel",
-          action: "Disponibilidade Offline",
-          checkedAt,
-        };
-      }
-    }
-
-    return {
+    const statusDesconhecido = {
       ok: false,
-      status: "error",
-      label: "WAHA desconectado",
-      detail: "Tunnel/WAHA indisponivel",
-      action: "Disponibilidade Offline",
+      session: SESSION,
+      status: "UNKNOWN",
+      isWorking: false,
+      label: "Status desconhecido",
+      detail: "Nao foi possivel consultar o WAHA",
+      action: "Indisponivel",
       checkedAt,
     };
+
+    try {
+      const response = await axios.get(`${WAHA_URL}/api/sessions?all=true`, {
+        headers: { "X-Api-Key": WAHA_API_KEY },
+        timeout: 4000,
+        validateStatus: () => true,
+      });
+
+      if (response.status === 401) {
+        return {
+          ...statusDesconhecido,
+          status: "UNKNOWN",
+          label: "WAHA inacessivel",
+          detail: "Erro de autenticacao",
+          action: "Verificar WAHA_API_KEY",
+        };
+      }
+
+      if (response.status < 200 || response.status >= 300) {
+        return statusDesconhecido;
+      }
+
+      const sessoes = Array.isArray(response.data) ? response.data : [];
+      const sessao = sessoes.find((item) => item?.name === SESSION);
+      const status = String(sessao?.status || "UNKNOWN").toUpperCase();
+      const isWorking = status === "WORKING";
+      const detalhesPorStatus = {
+        WORKING: "WhatsApp conectado e pronto.",
+        SCAN_QR_CODE: "Sessao precisa de QR Code.",
+        STOPPED: "Sessao parada. O bot pode nao responder.",
+        FAILED: "Erro na sessao.",
+        STARTING: "Sessao iniciando.",
+        UNKNOWN: "Nao foi possivel consultar o WAHA.",
+      };
+
+      return {
+        ok: isWorking,
+        session: SESSION,
+        status,
+        isWorking,
+        label: isWorking ? "WhatsApp conectado" : "WhatsApp requer atencao",
+        detail: detalhesPorStatus[status] || detalhesPorStatus.UNKNOWN,
+        action: isWorking ? "Operacional" : status,
+        checkedAt,
+      };
+    } catch (error) {
+      return statusDesconhecido;
+    }
   }
 
   async function enviarMensagem(numero, texto, opcoes = {}) {
