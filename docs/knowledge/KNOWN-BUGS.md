@@ -4,6 +4,31 @@
 
 Este arquivo registra riscos confirmados por inspeção do código em origin/main e pendencias operacionais. Ele nao prova estado real de infraestrutura.
 
+## Risco - Operar pasta errada por documentacao divergente
+
+Confirmado em 2026-07-06:
+
+Descricao:
+
+- Houve confusao entre pastas locais e o projeto correto.
+- Algumas pastas PWA/site foram avaliadas antes de confirmar a instalacao operacional.
+- A instalacao operacional principal confirmada e `C:\Users\User\1chat.digital`.
+
+Impacto:
+
+- Uma IA ou operador pode diagnosticar, sincronizar ou alterar a pasta errada.
+- Isso pode misturar projetos, deploys ou configuracoes que nao pertencem ao `1chat.digital`.
+
+Mitigacao:
+
+- `AGENTS.md` deve ser lido primeiro.
+- `docs/runbooks/GIT-SYNC.md` deve ser seguido antes de qualquer atualizacao via Git.
+- Validar `pwd`, remote, branch, status e arquivos criticos antes de qualquer `pull`.
+
+Prioridade: alta.
+
+Status: mitigado por documentacao, mas deve ser seguido em toda operacao.
+
 ## BUG-001 - Fallback WAHA usa porta local legada
 
 Confirmado por inspeção do código em origin/main:

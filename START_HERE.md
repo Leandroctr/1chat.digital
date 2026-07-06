@@ -2,6 +2,36 @@
 
 Este e o ponto inicial para qualquer trabalho no projeto.
 
+## Antes de atualizar este projeto via Git
+
+Nao comecar por `git pull`.
+
+Antes de qualquer atualizacao via Git, confirmar:
+
+- pasta real em uso;
+- `git remote -v`;
+- `git branch --show-current`;
+- `git status -sb`;
+- se o repositorio e o `1chat.digital` correto;
+- presenca dos arquivos criticos quando estiver na maquina operacional:
+  - `docker-compose.yml`;
+  - `waha-data/`;
+  - `bot/data/respostas.xlsx`.
+
+Instalacao operacional principal confirmada em 2026-07-06:
+
+```text
+C:\Users\User\1chat.digital
+```
+
+Se houver alteracao local em `bot/`, `.env`, `docker-compose.yml`, `waha-data/` ou `bot/data/`, parar e reportar antes de atualizar.
+
+Se a working tree estiver limpa, a branch for `main`, o remote for o correto e o repositorio estiver apenas behind, usar:
+
+```powershell
+git pull --ff-only origin main
+```
+
 ## Fonte da verdade
 
 Confirmado por inspeção do código em origin/main:
@@ -25,12 +55,16 @@ Pendente de validação:
 
 ## Ordem de leitura
 
-1. `CHATGPT_PROJECT_CONTEXT.md`
-2. `docs/AI_CONTEXT.md`
-3. `docs/ai/AI_RULES.md`
-4. `docs/ai/AI_CHANGE_POLICY.md`
-5. `docs/knowledge/SYSTEM-KNOWLEDGE.md`
-6. `docs/disaster-recovery/ARCHITECTURE.md`
+1. `AGENTS.md`
+2. `CHATGPT_PROJECT_CONTEXT.md`
+3. `docs/AI_CONTEXT.md`
+4. `docs/ai/AI_RULES.md`
+5. `docs/ai/CURRENT_STATUS.md`
+6. `docs/knowledge/PROJECT_MEMORY.md`
+7. `docs/knowledge/KNOWN-BUGS.md`
+8. `docs/ai/AI_CHANGE_POLICY.md`
+9. `docs/knowledge/SYSTEM-KNOWLEDGE.md`
+10. `docs/disaster-recovery/ARCHITECTURE.md`
 
 ## Regras antes de mudar qualquer coisa
 

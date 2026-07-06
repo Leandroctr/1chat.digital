@@ -1,5 +1,17 @@
 # Current Status - 1chat.digital
 
+## Status atual - 2026-07-06
+
+- WAHA operacional.
+- Pasta operacional confirmada: `C:\Users\User\1chat.digital`.
+- Sessao correta: `default`.
+- Dashboard WAHA acessivel.
+- Painel admin `1chat.digital` exibe:
+  - Integracao: status geral/tunnel/API.
+  - Status WhatsApp: sessao `default`.
+- Bot/Railway deve usar `WAHA_SESSION=default`.
+- `JANDIRA` e de outro projeto e nao deve aparecer em runtime do `1chat.digital`.
+
 ## Confirmado por inspeção do código em origin/main
 
 - Site estatico na raiz.

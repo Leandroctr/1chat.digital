@@ -2,6 +2,36 @@
 
 Contexto operacional para assistentes de IA e desenvolvedores trabalhando no `1chat.digital`.
 
+## Instalacao operacional confirmada
+
+Instalacao operacional principal confirmada em 2026-07-06:
+
+```text
+C:\Users\User\1chat.digital
+```
+
+Em outras maquinas podem existir copias, homologacoes, PWAs ou sites com nomes parecidos. Nunca assumir a pasta correta sem validar:
+
+- `pwd`;
+- `git remote -v`;
+- `git branch --show-current`;
+- `git status -sb`;
+- presenca de `docker-compose.yml`;
+- presenca de `waha-data/`;
+- presenca de `bot/data/respostas.xlsx`.
+
+A verdade operacional local e a pasta que contem `docker-compose.yml`, `waha-data/`, `bot/data/respostas.xlsx` e o remote correto do `1chat.digital`.
+
+## Estado atual confirmado em 2026-07-06
+
+- WAHA usa a sessao correta `default`.
+- Dashboard WAHA esta acessivel.
+- Railway/bot deve usar `WAHA_SESSION=default`.
+- `JANDIRA` pertence a outro projeto e nao deve ser usada neste projeto.
+- O painel admin exibe status separado:
+  - `systemStatus`: integracao geral, Cloudflare Tunnel e API;
+  - `wahaSession`: sessao WhatsApp `default`.
+
 ## Classificacao das informacoes
 
 Confirmado por inspeção do código em origin/main:
