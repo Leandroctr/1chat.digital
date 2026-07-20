@@ -95,6 +95,30 @@ configurarMiddlewares({
   SESSION_SECRET,
   logWarn,
 });
+
+app.use((err, req, res, next) => {
+  const isJsonParseError =
+    err &&
+    (err.type === "entity.parse.failed" ||
+      (err instanceof SyntaxError && err.status === 400 && "body" in err));
+
+  if (!isJsonParseError) {
+    return next(err);
+  }
+
+  console.warn("[HTTP] JSON invalido recebido", {
+    method: req.method,
+    path: req.originalUrl || req.url,
+    contentType: req.headers["content-type"],
+    userAgent: req.headers["user-agent"],
+  });
+
+  return res.status(400).json({
+    ok: false,
+    error: "invalid_json",
+  });
+});
+
 const {
   enviarMensagem,
   enviarImagem,
