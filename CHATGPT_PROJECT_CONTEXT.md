@@ -24,13 +24,13 @@ A verdade operacional local e a pasta que contem `docker-compose.yml`, `waha-dat
 
 ## Estado atual confirmado em 2026-07-06
 
-- WAHA usa a sessao correta `default`.
+- WAHA operacional usa a sessao configurada no ambiente.
 - Dashboard WAHA esta acessivel.
-- Railway/bot deve usar `WAHA_SESSION=default`.
+- Railway/bot deve definir `WAHA_SESSION`; a branch de reconstrução nao possui fallback silencioso.
 - `JANDIRA` pertence a outro projeto e nao deve ser usada neste projeto.
 - O painel admin exibe status separado:
   - `systemStatus`: integracao geral, Cloudflare Tunnel e API;
-  - `wahaSession`: sessao WhatsApp `default`.
+  - `wahaSession`: sessao WhatsApp configurada no ambiente.
 
 ## Classificacao das informacoes
 

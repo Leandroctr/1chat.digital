@@ -18,10 +18,9 @@ Informação privada / não versionada:
 PORT=3000
 NODE_ENV=production
 
-WAHA_URL=https://***WAHA_PUBLIC_OR_LOCAL_URL***
 WAHA_BASE_URL=https://***WAHA_PUBLIC_OR_LOCAL_URL***
 WAHA_API_KEY=***WAHA_API_KEY***
-WAHA_SESSION=default
+WAHA_SESSION=***WAHA_SESSION_NAME***
 
 DATABASE_URL=postgresql://***USER***:***PASSWORD***@***HOST***:***PORT***/***DATABASE***
 

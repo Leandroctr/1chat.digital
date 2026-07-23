@@ -87,12 +87,12 @@ Nao mexer sem diagnostico e autorizacao:
 
 ## Estado operacional importante
 
-- WAHA do `1chat.digital` usa a sessao `default`.
-- Railway/bot deve usar `WAHA_SESSION=default`.
+- WAHA do `1chat.digital` deve usar a sessao configurada explicitamente no ambiente.
+- Railway/bot deve definir `WAHA_SESSION`; a branch de reconstrução nao possui fallback silencioso.
 - `JANDIRA` pertence a outro projeto e nao deve aparecer em runtime do `1chat.digital`.
 - O painel admin separa:
   - `systemStatus`: integracao geral, Cloudflare Tunnel e API;
-  - `wahaSession`: sessao WhatsApp `default`.
+  - `wahaSession`: sessao WhatsApp configurada no ambiente.
 
 ## Ordem obrigatoria de leitura
 

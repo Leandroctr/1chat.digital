@@ -47,6 +47,33 @@ function registrarWebhookRoute({
   const encerramentosRecentes = new Map();
   const TEMPO_BLOQUEIO_ENCERRAMENTO_MS = 5 * 60 * 1000;
 
+  function ignorarWebhook(res, motivo) {
+    return res.status(200).json({
+      ok: true,
+      ignored: true,
+      reason: motivo,
+    });
+  }
+
+  function obterMessageId(message) {
+    const id = message?.id || message?._data?.id || null;
+    return typeof id === "string" && id.trim() ? id.trim() : null;
+  }
+
+  function obterOrigem(message) {
+    const origem = message?.from;
+    return typeof origem === "string" && origem.trim() ? origem.trim() : null;
+  }
+
+  function obterCorpo(message) {
+    const corpo = message?.body;
+    return typeof corpo === "string" && corpo.trim() ? corpo : null;
+  }
+
+  function mensagemFromMe(message) {
+    return Boolean(message?.fromMe || message?._data?.key?.fromMe);
+  }
+
   function usuarioRepetiuNegacaoEncerramento(mensagemNormalizada) {
     return ["nao", "n", "nao obrigado", "nao obrigada"].includes(mensagemNormalizada);
   }
@@ -213,18 +240,21 @@ function registrarWebhookRoute({
   app.post("/webhook", async (req, res) => {
     try {
       const payload = req.body;
-      const event = payload.event;
-      const message = payload.payload;
+      const event = payload?.event;
+      const message = payload?.payload;
 
-      if (event !== "message") return res.sendStatus(200);
-      if (!message || !message.from || !message.body) return res.sendStatus(200);
-      if (message.fromMe) return res.sendStatus(200);
-      if (message.from.includes("@g.us")) return res.sendStatus(200);
+      if (event === "message.any") return ignorarWebhook(res, "event_ignored");
+      if (event === "session.status") return ignorarWebhook(res, "session_status");
+      if (event !== "message") return ignorarWebhook(res, "event_ignored");
+      const numero = obterOrigem(message);
+      const mensagemTexto = obterCorpo(message);
+      if (!message || !numero || !mensagemTexto) return ignorarWebhook(res, "invalid_message");
+      if (!obterMessageId(message)) return ignorarWebhook(res, "missing_message_id");
+      if (mensagemFromMe(message)) return ignorarWebhook(res, "from_me");
+      if (numero.includes("@g.us")) return ignorarWebhook(res, "group_message");
 
-      const numero = message.from;
-      const mensagemTexto = message.body;
       const mensagemNormalizada = normalizarTexto(mensagemTexto);
-      const messageId = message.id || message._data?.id || `${numero}-${mensagemTexto}`;
+      const messageId = obterMessageId(message);
 
       if (mensagensProcessadas.has(messageId)) {
         escreverLog(`DUPLICADA IGNORADA | ${numero}`);
@@ -232,7 +262,13 @@ function registrarWebhookRoute({
       }
 
       mensagensProcessadas.add(messageId);
-      setTimeout(() => mensagensProcessadas.delete(messageId), 5 * 60 * 1000);
+      const timerDeduplicacao = setTimeout(
+        () => mensagensProcessadas.delete(messageId),
+        5 * 60 * 1000
+      );
+      if (typeof timerDeduplicacao.unref === "function") {
+        timerDeduplicacao.unref();
+      }
 
       escreverLog(`MENSAGEM | ${numero} | ${mensagemTexto}`);
       await registrarMetricasMensagem({ numero, mensagemTexto });
