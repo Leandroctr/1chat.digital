@@ -8,8 +8,22 @@ function requireEnv(name) {
   return String(value).trim();
 }
 
+function normalizeWahaBaseUrl(value) {
+  const normalized = String(value).trim().replace(/\/+$/, "");
+
+  if (!/^https?:\/\//i.test(normalized)) {
+    throw new Error("WAHA_BASE_URL must start with http:// or https://");
+  }
+
+  if (/^https?:\/\/[^/?#]+:[^/?#]+@/i.test(normalized)) {
+    throw new Error("WAHA_BASE_URL must not include credentials");
+  }
+
+  return normalized;
+}
+
 const PORT = process.env.PORT || 3000;
-const WAHA_URL = requireEnv("WAHA_BASE_URL");
+const WAHA_URL = normalizeWahaBaseUrl(requireEnv("WAHA_BASE_URL"));
 const WAHA_API_KEY = requireEnv("WAHA_API_KEY");
 const SESSION = requireEnv("WAHA_SESSION");
 const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
@@ -35,5 +49,6 @@ module.exports = {
   USAR_POSTGRES,
   WAHA_API_KEY,
   WAHA_URL,
+  normalizeWahaBaseUrl,
   requireEnv,
 };

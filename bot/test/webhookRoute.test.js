@@ -45,9 +45,9 @@ function criarAppTeste(overrides = {}) {
     cancelarTimerMensagemFinalPersistente: async () => {
       chamadas.cancelarTimerMensagemFinalPersistente += 1;
     },
-    registrarMetricasMensagem: async () => {
+    registrarMetricasMensagem: overrides.registrarMetricasMensagem || (async () => {
       chamadas.registrarMetricasMensagem += 1;
-    },
+    }),
     usuarioConfirmouEncerramento: () => false,
     enviarMensagemFinal: async () => {
       chamadas.enviarMensagemFinal += 1;
@@ -69,9 +69,9 @@ function criarAppTeste(overrides = {}) {
     },
     ETAPA_CONFIRMAR_FILA_FORA_HORARIO: "confirmar_fila_fora_horario",
     pediuOperador: () => false,
-    enviarMensagem: async () => {
+    enviarMensagem: overrides.enviarMensagem || (async () => {
       chamadas.enviarMensagem += 1;
-    },
+    }),
     pareceNomeCliente: () => true,
     primeiroNome: (nome) => String(nome || "").split(/\s+/)[0],
     validarCPF: () => ({ valido: true, cpfFormatado: "000.000.000-00" }),
@@ -191,11 +191,12 @@ test("message valido e processado uma unica vez", async () => {
 });
 
 test("message.any retorna 200 e nao processa", async () => {
-  const { app, chamadas } = criarAppTeste();
+  const { app, chamadas, mensagensProcessadas } = criarAppTeste();
   const response = await postWebhook(app, clone(fixtures.messageAny));
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.ignored, true);
+  assert.equal(mensagensProcessadas.size, 0);
   assertSemEfeitosFuncionais(chamadas);
 });
 
@@ -378,6 +379,23 @@ test("id em objeto inesperado nao vira chave object Object", async () => {
   assertSemEfeitosFuncionais(chamadas);
 });
 
+test("id invalido nao entra no Set", async () => {
+  const { app, mensagensProcessadas } = criarAppTeste();
+  const response = await postWebhook(app, {
+    event: "message",
+    payload: {
+      id: "   ",
+      from: "cliente@c.us",
+      body: "ola",
+      fromMe: false,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.reason, "missing_message_id");
+  assert.equal(mensagensProcessadas.size, 0);
+});
+
 test("mensagem de midia sem body segue contrato atual e nao processa", async () => {
   const { app, chamadas } = criarAppTeste();
   const response = await postWebhook(app, clone(fixtures.midiaSemBody));
@@ -450,7 +468,7 @@ test("id repetido com payload diferente nao processa novamente", async () => {
   assert.equal(chamadas.enviarMensagem, 1);
 });
 
-test("erro real no processador retorna 500 e registra erro", async () => {
+test("erro real no processador retorna 500, registra erro e remove id do Set", async () => {
   const { app, chamadas, mensagensProcessadas } = criarAppTeste({
     obterOuCriarAtendimento: async () => {
       chamadas.obterOuCriarAtendimento += 1;
@@ -464,24 +482,80 @@ test("erro real no processador retorna 500 e registra erro", async () => {
   assert.equal(response.body, "Internal Server Error");
   assert.equal(chamadas.obterOuCriarAtendimento, 1);
   assert.equal(chamadas.logError, 1);
-  assert.equal(mensagensProcessadas.has("msg-erro-real"), true);
+  assert.equal(mensagensProcessadas.has("msg-erro-real"), false);
 });
 
-test("erro real mantem id deduplicado e repeticao posterior fica silenciosa", async () => {
+test("erro real permite retry com mesmo id e sucesso volta a deduplicar", async () => {
+  let deveFalhar = true;
   const { app, chamadas } = criarAppTeste({
     obterOuCriarAtendimento: async () => {
       chamadas.obterOuCriarAtendimento += 1;
-      throw new Error("falha controlada");
+      if (deveFalhar) {
+        deveFalhar = false;
+        throw new Error("falha controlada");
+      }
+      return { etapa: "inicio", modo: "bot" };
     },
   });
 
-  const first = await postWebhook(app, mensagemValida("msg-erro-dedupe"));
-  const second = await postWebhook(app, mensagemValida("msg-erro-dedupe"));
+  const first = await postWebhook(app, mensagemValida("msg-retry"));
+  const second = await postWebhook(app, mensagemValida("msg-retry"));
+  const third = await postWebhook(app, mensagemValida("msg-retry"));
 
   assert.equal(first.statusCode, 500);
   assert.equal(first.body, "Internal Server Error");
   assert.equal(second.statusCode, 200);
   assert.equal(second.body, "OK");
-  assert.equal(chamadas.obterOuCriarAtendimento, 1);
+  assert.equal(third.statusCode, 200);
+  assert.equal(third.body, "OK");
+  assert.equal(chamadas.obterOuCriarAtendimento, 2);
   assert.equal(chamadas.logError, 1);
+  assert.equal(chamadas.enviarMensagem, 1);
+});
+
+test("erro de um id nao remove outro id ja existente", async () => {
+  const { app, chamadas, mensagensProcessadas } = criarAppTeste({
+    obterOuCriarAtendimento: async () => {
+      chamadas.obterOuCriarAtendimento += 1;
+      throw new Error("falha controlada");
+    },
+  });
+  mensagensProcessadas.add("msg-existente");
+
+  const response = await postWebhook(app, mensagemValida("msg-erro-isolado"));
+
+  assert.equal(response.statusCode, 500);
+  assert.equal(mensagensProcessadas.has("msg-existente"), true);
+  assert.equal(mensagensProcessadas.has("msg-erro-isolado"), false);
+});
+
+test("duas entregas simultaneas com mesmo id processam apenas uma vez", async () => {
+  let liberarProcessamento;
+  const processamentoLiberado = new Promise((resolve) => {
+    liberarProcessamento = resolve;
+  });
+  let processamentoIniciado;
+  const iniciouProcessamento = new Promise((resolve) => {
+    processamentoIniciado = resolve;
+  });
+
+  const { app, chamadas } = criarAppTeste({
+    registrarMetricasMensagem: async () => {
+      chamadas.registrarMetricasMensagem += 1;
+      processamentoIniciado();
+      await processamentoLiberado;
+    },
+  });
+
+  const primeiraEntrega = postWebhook(app, mensagemValida("msg-concorrente"));
+  await iniciouProcessamento;
+  const segundaEntrega = postWebhook(app, mensagemValida("msg-concorrente"));
+  liberarProcessamento();
+
+  const [first, second] = await Promise.all([primeiraEntrega, segundaEntrega]);
+
+  assert.equal(first.statusCode, 200);
+  assert.equal(second.statusCode, 200);
+  assert.equal(chamadas.registrarMetricasMensagem, 1);
+  assert.equal(chamadas.obterOuCriarAtendimento, 1);
 });

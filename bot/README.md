@@ -40,6 +40,7 @@ WAHA_SESSION=nome-da-sessao
 ```
 
 `WAHA_BASE_URL`, `WAHA_API_KEY` e `WAHA_SESSION` sao obrigatorias. O bot nao usa fallback silencioso para nome de sessao; configure explicitamente a sessao correta em cada ambiente.
+`WAHA_BASE_URL` aceita barra final, mas o valor e normalizado internamente para evitar URLs com `//api`.
 
 ## Railway
 
@@ -57,6 +58,7 @@ Pontos importantes:
 - O evento `message` so e processado quando traz ID de mensagem, origem, corpo, nao e `fromMe` e nao e grupo.
 - `message.any`, `session.status`, mensagens `fromMe`, grupos e eventos desconhecidos retornam HTTP 200 e nao acionam fluxo, banco, digitacao ou envio.
 - A deduplicacao atual e em memoria por ID da mensagem e nao sobrevive a restart da aplicacao.
+- Se um erro real gerar HTTP 500, o ID da tentativa e removido da deduplicacao em memoria para permitir nova entrega do WAHA. Se a falha ocorrer depois de algum efeito externo, uma repeticao parcial ainda pode acontecer.
 
 ## Nao versionar
 

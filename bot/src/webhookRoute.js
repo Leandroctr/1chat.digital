@@ -238,6 +238,8 @@ function registrarWebhookRoute({
   }
 
   app.post("/webhook", async (req, res) => {
+    let messageIdAdicionadoNestaTentativa = null;
+
     try {
       const payload = req.body;
       const event = payload?.event;
@@ -262,6 +264,7 @@ function registrarWebhookRoute({
       }
 
       mensagensProcessadas.add(messageId);
+      messageIdAdicionadoNestaTentativa = messageId;
       const timerDeduplicacao = setTimeout(
         () => mensagensProcessadas.delete(messageId),
         5 * 60 * 1000
@@ -578,6 +581,10 @@ function registrarWebhookRoute({
 
       return res.sendStatus(200);
     } catch (error) {
+      if (messageIdAdicionadoNestaTentativa) {
+        mensagensProcessadas.delete(messageIdAdicionadoNestaTentativa);
+      }
+
       escreverLog(`ERRO | ${error.message}`);
       logError("ERRO", "Erro no webhook", error);
 
