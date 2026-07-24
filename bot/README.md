@@ -25,9 +25,9 @@ Valores locais padrao:
 
 ```env
 PORT=3000
-WAHA_BASE_URL=http://localhost:3001
-WAHA_API_KEY=123456
-WAHA_SESSION=default
+WAHA_BASE_URL=http://localhost:3000
+WAHA_API_KEY=CHANGE_ME
+WAHA_SESSION=nome-da-sessao
 ```
 
 No Railway, configure pelo menos:
@@ -35,9 +35,12 @@ No Railway, configure pelo menos:
 ```env
 NODE_ENV=production
 WAHA_BASE_URL=https://sua-url-publica-do-waha
-WAHA_API_KEY=123456
-WAHA_SESSION=default
+WAHA_API_KEY=CHANGE_ME
+WAHA_SESSION=nome-da-sessao
 ```
+
+`WAHA_BASE_URL`, `WAHA_API_KEY` e `WAHA_SESSION` sao obrigatorias. O bot nao usa fallback silencioso para nome de sessao; configure explicitamente a sessao correta em cada ambiente.
+`WAHA_BASE_URL` aceita barra final, mas o valor e normalizado internamente para evitar URLs com `//api`.
 
 ## Railway
 
@@ -49,6 +52,13 @@ Pontos importantes:
 - O WAHA local nao sera acessivel pelo Railway usando `localhost`.
 - Para manter WAHA local, exponha o WAHA com um tunel seguro e use essa URL em `WAHA_BASE_URL`.
 - `data/` e `logs/` gravam em disco local; em Railway, use volume para persistencia real.
+
+## Webhook WAHA
+
+- O evento `message` so e processado quando traz ID de mensagem, origem, corpo, nao e `fromMe` e nao e grupo.
+- `message.any`, `session.status`, mensagens `fromMe`, grupos e eventos desconhecidos retornam HTTP 200 e nao acionam fluxo, banco, digitacao ou envio.
+- A deduplicacao atual e em memoria por ID da mensagem e nao sobrevive a restart da aplicacao.
+- Se um erro real gerar HTTP 500, o ID da tentativa e removido da deduplicacao em memoria para permitir nova entrega do WAHA. Se a falha ocorrer depois de algum efeito externo, uma repeticao parcial ainda pode acontecer.
 
 ## Nao versionar
 

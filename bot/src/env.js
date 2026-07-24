@@ -1,7 +1,31 @@
+function requireEnv(name) {
+  const value = process.env[name];
+
+  if (!value || !String(value).trim()) {
+    throw new Error(`${name} is required`);
+  }
+
+  return String(value).trim();
+}
+
+function normalizeWahaBaseUrl(value) {
+  const normalized = String(value).trim().replace(/\/+$/, "");
+
+  if (!/^https?:\/\//i.test(normalized)) {
+    throw new Error("WAHA_BASE_URL must start with http:// or https://");
+  }
+
+  if (/^https?:\/\/[^/?#]+:[^/?#]+@/i.test(normalized)) {
+    throw new Error("WAHA_BASE_URL must not include credentials");
+  }
+
+  return normalized;
+}
+
 const PORT = process.env.PORT || 3000;
-const WAHA_URL = process.env.WAHA_URL || process.env.WAHA_BASE_URL || "http://localhost:3001";
-const WAHA_API_KEY = process.env.WAHA_API_KEY || "123456";
-const SESSION = process.env.WAHA_SESSION || "default";
+const WAHA_URL = normalizeWahaBaseUrl(requireEnv("WAHA_BASE_URL"));
+const WAHA_API_KEY = requireEnv("WAHA_API_KEY");
+const SESSION = requireEnv("WAHA_SESSION");
 const USAR_POSTGRES = Boolean(process.env.DATABASE_URL);
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,4 +49,6 @@ module.exports = {
   USAR_POSTGRES,
   WAHA_API_KEY,
   WAHA_URL,
+  normalizeWahaBaseUrl,
+  requireEnv,
 };

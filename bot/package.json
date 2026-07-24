@@ -4,7 +4,9 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check index.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

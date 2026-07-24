@@ -4,12 +4,12 @@
 
 - WAHA operacional.
 - Pasta operacional confirmada: `C:\Users\User\1chat.digital`.
-- Sessao correta: `default`.
+- Sessao WAHA deve ser configurada explicitamente por ambiente.
 - Dashboard WAHA acessivel.
 - Painel admin `1chat.digital` exibe:
   - Integracao: status geral/tunnel/API.
   - Status WhatsApp: sessao `default`.
-- Bot/Railway deve usar `WAHA_SESSION=default`.
+- Bot/Railway deve definir `WAHA_SESSION`; a branch de reconstrução ainda nao foi publicada.
 - `JANDIRA` e de outro projeto e nao deve aparecer em runtime do `1chat.digital`.
 
 ## Confirmado por inspeção do código em origin/main

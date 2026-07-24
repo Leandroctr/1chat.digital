@@ -53,7 +53,7 @@ Esse status alimenta o card lateral "Status WhatsApp".
 O projeto `1chat.digital` deve usar:
 
 ```text
-WAHA_SESSION=default
+WAHA_SESSION=<nome-da-sessao>
 ```
 
 `JANDIRA` pertence a outro projeto e nao deve aparecer em runtime do `1chat.digital`.
